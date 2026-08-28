@@ -1,0 +1,1537 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="color-scheme" content="light">
+    <meta name="theme-color" content="#0f4c81">
+    <title>Acta de entrega de dispositivo móvil</title>
+
+    <!--
+      ==========================================================================================
+      ACTA DE ENTREGA DE DISPOSITIVO MÓVIL — formulario instalado en el equipo con MobiControl.
+
+      Este archivo es autocontenido a propósito: no carga jQuery, Bootstrap, signature_pad,
+      jsPDF ni html2canvas desde ningún CDN. Los equipos de la flota salen a internet con datos
+      restringidos y, cuando el CDN no cargaba, el formulario quedaba sin firma y sin botón. Todo
+      lo que necesita —estilos, captura de firma y envío— va aquí adentro.
+
+      El PDF ya no se arma en el dispositivo. Lo genera el API a partir de los mismos datos, con
+      texto real en vez de una foto del formulario, y queda guardado junto con la firma.
+
+      Las credenciales de MobiControl tampoco viven aquí: antes estaban en texto plano dentro de
+      este archivo, legibles por cualquiera con el equipo en la mano. Ahora el API es quien
+      obtiene el token, marca los atributos personalizados y pide el check-in.
+
+      Nota sobre el CSS: MobiControl reemplaza en todo el archivo cualquier nombre encerrado
+      entre dos signos de porcentaje. Por eso se evita a propósito escribir dos de esos signos
+      cerca uno del otro: nada de translate con porcentajes negativos ni de keyframes numerados.
+      Donde el texto del acta necesita mostrar un porcentaje, se escribe con la entidad HTML.
+      ==========================================================================================
+    -->
+
+    <style>
+        :root {
+            /* Tema claro fijo. El formulario se firma a la luz del día, muchas veces en
+               la calle, y el modo oscuro del equipo bajaba el contraste del acta justo
+               cuando más se necesita leerla. */
+            color-scheme: light;
+
+            --azul: #0f4c81;
+            --azul-fuerte: #0b3c68;
+            --azul-suave: #e8f1f9;
+            --verde: #0f7b52;
+            --verde-suave: #e6f4ee;
+            --rojo: #b42318;
+            --rojo-suave: #fdeceb;
+            --ambar: #a8620a;
+            --ambar-suave: #fdf3e4;
+
+            --fondo: #f4f6f9;
+            --superficie: #ffffff;
+            --superficie-2: #f8fafc;
+            --borde: #dfe5ec;
+            --borde-fuerte: #c4cede;
+            --texto: #1a2432;
+            --texto-suave: #5b6b80;
+            --texto-tenue: #8494a8;
+
+            --radio: 14px;
+            --radio-sm: 10px;
+            --sombra: 0 1px 2px rgba(16, 34, 56, .06), 0 8px 24px rgba(16, 34, 56, .06);
+            --barra-alto: 96px;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: var(--fondo);
+            color: var(--texto);
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 15px;
+            line-height: 1.55;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ------------------------------------------------------------------ Encabezado */
+
+        .cabecera {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: var(--azul);
+            color: #fff;
+            padding: 14px 18px;
+            padding-top: max(14px, env(safe-area-inset-top));
+            box-shadow: 0 2px 12px rgba(15, 76, 129, .25);
+        }
+
+        .cabecera h1 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 650;
+            letter-spacing: .1px;
+        }
+
+        .cabecera p {
+            margin: 2px 0 0;
+            font-size: 12.5px;
+            opacity: .85;
+        }
+
+        .contenido {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 16px 16px calc(var(--barra-alto) + 24px);
+        }
+
+        /* ------------------------------------------------------------------ Tarjetas */
+
+        .tarjeta {
+            background: var(--superficie);
+            border: 1px solid var(--borde);
+            border-radius: var(--radio);
+            box-shadow: var(--sombra);
+            margin-bottom: 14px;
+            overflow: hidden;
+        }
+
+        .tarjeta-cuerpo {
+            padding: 16px 18px;
+        }
+
+        .tarjeta-titulo {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            margin: 0 0 12px;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: .6px;
+            text-transform: uppercase;
+            color: var(--texto-suave);
+        }
+
+        .tarjeta-titulo::before {
+            content: "";
+            width: 3px;
+            height: 15px;
+            border-radius: 2px;
+            background: var(--azul);
+            flex: none;
+        }
+
+        .intro {
+            margin: 0;
+            color: var(--texto-suave);
+            font-size: 14.5px;
+        }
+
+        .intro strong {
+            color: var(--texto);
+        }
+
+        /* ------------------------------------------------------------------ Datos del equipo */
+
+        .datos {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1px;
+            background: var(--borde);
+            border: 1px solid var(--borde);
+            border-radius: var(--radio-sm);
+            overflow: hidden;
+        }
+
+        @media (min-width: 540px) {
+            .datos {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .dato {
+            background: var(--superficie);
+            padding: 11px 14px;
+            min-height: 62px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 2px;
+        }
+
+        .dato-etiqueta {
+            font-size: 11.5px;
+            font-weight: 600;
+            letter-spacing: .5px;
+            text-transform: uppercase;
+            color: var(--texto-tenue);
+        }
+
+        .dato-valor {
+            font-size: 15px;
+            font-weight: 550;
+            word-break: break-word;
+        }
+
+        .dato-valor.mono {
+            font-family: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+            font-size: 14px;
+            letter-spacing: .2px;
+        }
+
+        /* Los datos del equipo son de solo lectura: los reporta MobiControl y el acta
+           pierde su valor probatorio si quien recibe el equipo puede cambiarlos antes de
+           firmar. Cuando un dato no llega, se marca como pendiente y lo corrige TI en la
+           consola, no el asociado en el formulario. */
+        .dato.sin-dato {
+            background: var(--ambar-suave);
+        }
+
+        .dato.sin-dato .dato-etiqueta {
+            color: var(--ambar);
+        }
+
+        .faltante {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--ambar);
+        }
+
+        /* ------------------------------------------------------------------ Avisos */
+
+        .aviso {
+            display: flex;
+            gap: 11px;
+            align-items: flex-start;
+            padding: 13px 15px;
+            border-radius: var(--radio-sm);
+            font-size: 14px;
+            margin-bottom: 14px;
+            border: 1px solid transparent;
+        }
+
+        .aviso-icono {
+            flex: none;
+            width: 20px;
+            height: 20px;
+            margin-top: 1px;
+        }
+
+        .aviso strong {
+            display: block;
+            margin-bottom: 1px;
+        }
+
+        .aviso.alerta {
+            background: var(--ambar-suave);
+            border-color: var(--ambar);
+            color: var(--ambar);
+        }
+
+        .aviso.error {
+            background: var(--rojo-suave);
+            border-color: var(--rojo);
+            color: var(--rojo);
+        }
+
+        .aviso.info {
+            background: var(--azul-suave);
+            border-color: var(--azul);
+            color: var(--azul-fuerte);
+        }
+
+        .aviso.exito {
+            background: var(--verde-suave);
+            border-color: var(--verde);
+            color: var(--verde);
+        }
+
+        .aviso p {
+            margin: 0;
+        }
+
+        /* ------------------------------------------------------------------ Cláusulas */
+
+        .clausula {
+            border-top: 1px solid var(--borde);
+        }
+
+        .clausula:first-of-type {
+            border-top: 0;
+        }
+
+        .clausula summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 620;
+            font-size: 14.5px;
+            user-select: none;
+        }
+
+        .clausula summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .clausula summary .flecha {
+            margin-left: auto;
+            flex: none;
+            width: 18px;
+            height: 18px;
+            color: var(--texto-tenue);
+            transition: transform .18s ease;
+        }
+
+        .clausula[open] summary .flecha {
+            transform: rotate(90deg);
+        }
+
+        .clausula-texto {
+            padding: 0 18px 16px;
+            color: var(--texto-suave);
+            font-size: 14px;
+        }
+
+        .clausula-texto p {
+            margin: 0 0 10px;
+            text-align: justify;
+        }
+
+        .clausula-texto ol,
+        .clausula-texto ul {
+            margin: 0 0 10px;
+            padding-left: 20px;
+        }
+
+        .clausula-texto li {
+            margin-bottom: 7px;
+            text-align: justify;
+        }
+
+        /* ------------------------------------------------------------------ Campo y firma */
+
+        .campo {
+            display: block;
+            margin-bottom: 14px;
+        }
+
+        .campo-etiqueta {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .5px;
+            text-transform: uppercase;
+            color: var(--texto-suave);
+            margin-bottom: 6px;
+        }
+
+        .campo input[type="text"] {
+            width: 100%;
+            padding: 12px 14px;
+            font: inherit;
+            font-size: 16px;
+            color: var(--texto);
+            background: var(--superficie-2);
+            border: 1px solid var(--borde-fuerte);
+            border-radius: var(--radio-sm);
+        }
+
+        .campo input[type="text"]:focus {
+            outline: none;
+            border-color: var(--azul);
+            box-shadow: 0 0 0 3px var(--azul-suave);
+        }
+
+        .campo input.invalido {
+            border-color: var(--rojo);
+        }
+
+        .lienzo-marco {
+            position: relative;
+            background: var(--superficie-2);
+            border: 2px dashed var(--borde-fuerte);
+            border-radius: var(--radio-sm);
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        .lienzo-marco.firmado {
+            border-style: solid;
+            border-color: var(--verde);
+            background: var(--superficie);
+        }
+
+        #lienzo-firma {
+            display: block;
+            width: 100%;
+            height: 190px;
+            touch-action: none;
+        }
+
+        .lienzo-guia {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 34px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            pointer-events: none;
+            color: var(--texto-tenue);
+            font-size: 13px;
+            transition: opacity .15s ease;
+        }
+
+        .lienzo-guia .linea {
+            width: 72%;
+            border-top: 1px solid var(--borde-fuerte);
+        }
+
+        .lienzo-marco.firmado .lienzo-guia {
+            opacity: 0;
+        }
+
+        .fila-acciones {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        /* ------------------------------------------------------------------ Botones */
+
+        .boton {
+            appearance: none;
+            border: 1px solid transparent;
+            border-radius: var(--radio-sm);
+            font: inherit;
+            font-weight: 620;
+            font-size: 15px;
+            padding: 13px 18px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background .15s ease, opacity .15s ease;
+        }
+
+        .boton:disabled {
+            opacity: .55;
+            cursor: not-allowed;
+        }
+
+        .boton-primario {
+            background: var(--azul);
+            color: #fff;
+            width: 100%;
+        }
+
+        .boton-primario:not(:disabled):active {
+            background: var(--azul-fuerte);
+        }
+
+        .boton-secundario {
+            background: var(--superficie);
+            border-color: var(--borde-fuerte);
+            color: var(--texto-suave);
+        }
+
+        .boton-secundario:active {
+            background: var(--superficie-2);
+        }
+
+        .boton-peligro {
+            background: var(--superficie);
+            border-color: var(--borde-fuerte);
+            color: var(--rojo);
+        }
+
+        .boton .icono {
+            width: 18px;
+            height: 18px;
+            flex: none;
+        }
+
+        /* ------------------------------------------------------------------ Barra inferior */
+
+        .barra {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 25;
+            background: var(--superficie);
+            border-top: 1px solid var(--borde);
+            padding: 12px 16px;
+            padding-bottom: max(12px, env(safe-area-inset-bottom));
+            box-shadow: 0 -4px 20px rgba(16, 34, 56, .08);
+        }
+
+        .barra-interior {
+            max-width: 720px;
+            margin: 0 auto;
+        }
+
+        .acepto {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 11px;
+            font-size: 13.5px;
+            color: var(--texto-suave);
+            cursor: pointer;
+        }
+
+        .acepto input {
+            flex: none;
+            width: 21px;
+            height: 21px;
+            margin: 0;
+            accent-color: var(--azul);
+        }
+
+        /* ------------------------------------------------------------------ Superposiciones */
+
+        .capa {
+            position: fixed;
+            inset: 0;
+            z-index: 60;
+            background: rgba(12, 20, 30, .55);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .capa[hidden] {
+            display: none;
+        }
+
+        .panel {
+            background: var(--superficie);
+            border-radius: var(--radio);
+            padding: 22px;
+            max-width: 400px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, .3);
+            text-align: center;
+        }
+
+        .panel h2 {
+            margin: 0 0 8px;
+            font-size: 18px;
+        }
+
+        .panel p {
+            margin: 0 0 18px;
+            color: var(--texto-suave);
+            font-size: 14.5px;
+        }
+
+        .panel .fila-acciones .boton {
+            flex: 1;
+        }
+
+        .girador {
+            width: 42px;
+            height: 42px;
+            margin: 0 auto 16px;
+            border: 3px solid var(--borde);
+            border-top-color: var(--azul);
+            border-radius: 50%;
+            animation: girar .8s linear infinite;
+        }
+
+        /* De "from" a "to" y no de cero a cien: dos porcentajes en el mismo bloque
+           corren el riesgo de que MobiControl los lea como una variable a reemplazar. */
+        @keyframes girar {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ------------------------------------------------------------------ Pantalla final */
+
+        .final {
+            position: fixed;
+            inset: 0;
+            z-index: 70;
+            background: var(--fondo);
+            overflow-y: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .final[hidden] {
+            display: none;
+        }
+
+        .final-caja {
+            max-width: 420px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .final-marca {
+            width: 74px;
+            height: 74px;
+            margin: 0 auto 18px;
+            border-radius: 50%;
+            background: var(--verde-suave);
+            color: var(--verde);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .final-marca svg {
+            width: 38px;
+            height: 38px;
+        }
+
+        .final h2 {
+            margin: 0 0 6px;
+            font-size: 21px;
+        }
+
+        .final p {
+            margin: 0 0 20px;
+            color: var(--texto-suave);
+        }
+
+        .final-numero {
+            display: inline-block;
+            font-family: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+            font-size: 15px;
+            letter-spacing: 1px;
+            background: var(--superficie);
+            border: 1px solid var(--borde);
+            border-radius: 8px;
+            padding: 8px 14px;
+            margin-bottom: 20px;
+        }
+
+        .oculto {
+            display: none !important;
+        }
+
+        .sr {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0 0 0 0);
+            white-space: nowrap;
+        }
+    </style>
+</head>
+
+<body>
+    <header class="cabecera">
+        <h1>Acta de entrega de dispositivo móvil</h1>
+        <p id="cab-detalle">Revisa la información y firma para confirmar la entrega</p>
+    </header>
+
+    <main class="contenido">
+        <div id="avisos"></div>
+
+        <section class="tarjeta">
+            <div class="tarjeta-cuerpo">
+                <p class="intro">
+                    El suscrito <strong id="txt-usuario">—</strong>, identificado con la cédula de ciudadanía
+                    No <strong id="txt-cedula">—</strong> (en adelante EL TENEDOR) y HV. (en adelante LA EMPRESA)
+                    suscribimos el presente documento para la entrega de un DISPOSITIVO MÓVIL, acorde a las
+                    condiciones que se detallan a continuación.
+                </p>
+            </div>
+        </section>
+
+        <section class="tarjeta">
+            <div class="tarjeta-cuerpo">
+                <h2 class="tarjeta-titulo">Datos del equipo</h2>
+                <div class="datos" id="rejilla-datos"></div>
+            </div>
+        </section>
+
+        <section class="tarjeta" id="tarjeta-entregables" hidden>
+            <div class="tarjeta-cuerpo">
+                <h2 class="tarjeta-titulo">Otros entregables</h2>
+                <p class="intro" id="txt-entregables">—</p>
+            </div>
+        </section>
+
+        <section class="tarjeta">
+            <div class="tarjeta-cuerpo" style="padding-bottom:6px">
+                <h2 class="tarjeta-titulo">Condiciones del acta</h2>
+            </div>
+
+            <details class="clausula">
+                <summary>
+                    SEGUNDA: Obligaciones del tenedor
+                    <svg class="flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M9 18l6-6-6-6" />
+                    </svg>
+                </summary>
+                <div class="clausula-texto">
+                    <ol>
+                        <li>
+                            Constituyen obligación del TENEDOR utilizar como herramienta de trabajo el mencionado
+                            equipo; por lo tanto, está obligado a mantenerlo encendido durante el tiempo que esté
+                            laborando.
+                        </li>
+                        <li>
+                            Devolver en buen estado el equipo en caso de retiro de HV, de acuerdo con el procedimiento
+                            GF-GTI-1754 Administración de dispositivos móviles.
+                        </li>
+                        <li>
+                            El Trabajador no podrá prestar el equipo a terceras personas sin previa autorización de LA
+                            EMPRESA.
+                        </li>
+                        <li>
+                            En caso de robo o pérdida del equipo, procederá de acuerdo con las siguientes instrucciones:
+                            <ol type="a">
+                                <li>
+                                    Llamar al operador celular de inmediato para solicitar la desconexión de la unidad a
+                                    través del *611 desde un celular o a través de la persona encargada en Tecnología
+                                    Informática.
+                                </li>
+                                <li>Notificar al Jefe Inmediato.</li>
+                                <li>
+                                    Colocar el denuncio y enviarlo a la persona encargada en Tecnología Informática, de
+                                    acuerdo con el procedimiento GF-GTI-1754 Administración de dispositivos móviles.
+                                </li>
+                            </ol>
+                        </li>
+                        <li>
+                            Hacer uso del equipo adoptando las POLÍTICAS detalladas en el procedimiento GF.GTI-620
+                            SOLICITUD DE REQUERIMIENTOS A TIC.
+                        </li>
+                    </ol>
+                </div>
+            </details>
+
+            <details class="clausula">
+                <summary>
+                    TERCERA: Autorización de descuentos
+                    <svg class="flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M9 18l6-6-6-6" />
+                    </svg>
+                </summary>
+                <div class="clausula-texto">
+                    <p>
+                        En caso de pérdida, robo, daño del equipo durante su vida útil o en los eventos que se presenten
+                        consumos no autorizados (mensajes de texto SMS, MMS, descargas de tonos, videos e imágenes,
+                        navegación en páginas no autorizadas), EL TENEDOR autoriza a la empresa a descontar de sus
+                        salarios, prestaciones sociales comunes y especiales, cesantías, intereses a las cesantías,
+                        primas, indemnizaciones, pensiones, beneficios y demás derechos generados a raíz de su
+                        vinculación laboral con la empresa, los dineros necesarios para cubrir el valor de la sanción de
+                        acuerdo con la condición CUARTA de este documento y los gastos de consumos no autorizados que
+                        sean facturados por la empresa operadora del servicio móvil.
+                    </p>
+                </div>
+            </details>
+
+            <details class="clausula">
+                <summary>
+                    CUARTA: Sanciones por evento y descuentos
+                    <svg class="flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M9 18l6-6-6-6" />
+                    </svg>
+                </summary>
+                <div class="clausula-texto">
+                    <p>
+                        Las sanciones por evento en caso de robo, pérdida o daño imputado al usuario serán las
+                        siguientes:
+                    </p>
+                    <!-- Los porcentajes van como entidad HTML a propósito: escritos con el signo
+                         literal, el texto entre dos de ellos parece un nombre de variable y
+                         MobiControl lo reemplazaría, borrando parte de la cláusula. -->
+                    <ul>
+                        <li>La primera vez, la empresa asumirá el 50&#37; del costo y el empleado el otro 50&#37;.</li>
+                        <li>La segunda vez, la empresa descontará el 100&#37; del costo del equipo.</li>
+                    </ul>
+                </div>
+            </details>
+        </section>
+
+        <section class="tarjeta">
+            <div class="tarjeta-cuerpo">
+                <h2 class="tarjeta-titulo">Firma del asociado</h2>
+
+                <label class="campo">
+                    <span class="campo-etiqueta">Nombre del asociado</span>
+                    <input type="text" id="campo-nombre" autocomplete="name" autocapitalize="words"
+                        placeholder="Nombre completo de quien recibe" required>
+                </label>
+
+                <span class="campo-etiqueta">Firma</span>
+                <div class="lienzo-marco" id="marco-firma">
+                    <canvas id="lienzo-firma"></canvas>
+                    <div class="lienzo-guia">
+                        <span class="linea"></span>
+                        <span>Firme aquí con el dedo</span>
+                    </div>
+                </div>
+
+                <div class="fila-acciones">
+                    <button type="button" class="boton boton-peligro" id="btn-borrar" style="flex:1">
+                        <svg class="icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+                        </svg>
+                        Borrar firma
+                    </button>
+                </div>
+
+                <p class="intro" style="margin-top:12px;font-size:13px">
+                    En señal de conformidad las partes suscriben el presente documento en la ciudad de
+                    <strong id="txt-ciudad">Cali</strong> el <strong id="txt-fecha">—</strong>.
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <div class="barra">
+        <div class="barra-interior">
+            <label class="acepto">
+                <input type="checkbox" id="chk-acepto">
+                <span>He leído y acepto las condiciones del acta, y recibo el equipo descrito arriba.</span>
+            </label>
+            <button type="button" class="boton boton-primario" id="btn-enviar" disabled>
+                <svg class="icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M20 6L9 17l-5-5" />
+                </svg>
+                Firmar y enviar
+            </button>
+        </div>
+    </div>
+
+    <div class="capa" id="capa-confirmar" hidden>
+        <div class="panel" role="dialog" aria-modal="true" aria-labelledby="titulo-confirmar">
+            <h2 id="titulo-confirmar">¿Confirmas el envío?</h2>
+            <p>Se registrará el acta con tu firma y quedará como constancia de la entrega del equipo.</p>
+            <div class="fila-acciones">
+                <button type="button" class="boton boton-secundario" id="btn-cancelar">Revisar</button>
+                <button type="button" class="boton boton-primario" id="btn-confirmar">Sí, enviar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="capa" id="capa-cargando" hidden>
+        <div class="panel">
+            <div class="girador"></div>
+            <h2>Registrando el acta…</h2>
+            <p id="txt-cargando" style="margin:0">Guardando tu firma y generando el documento.</p>
+        </div>
+    </div>
+
+    <div class="final" id="pantalla-final" hidden>
+        <div class="final-caja">
+            <div class="final-marca">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                    stroke-linejoin="round" aria-hidden="true">
+                    <path d="M20 6L9 17l-5-5" />
+                </svg>
+            </div>
+            <h2 id="final-titulo">Acta registrada</h2>
+            <p id="final-texto">La entrega quedó firmada y sincronizada con MobiControl.</p>
+            <div class="final-numero" id="final-numero">—</div>
+            <button type="button" class="boton boton-primario" id="btn-ver-pdf">
+                <svg class="icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                    <path d="M14 2v6h6" />
+                </svg>
+                Ver acta en PDF
+            </button>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            "use strict";
+
+            // ======================================================================
+            // CONFIGURACIÓN
+            // ======================================================================
+            var CONFIG = {
+                // URL del API. En producción se apunta al servidor donde queda publicado.
+                apiBaseUrl: "http://localhost:5234",
+
+                // Llave de acceso del formulario. Lo ideal es publicarla como atributo
+                // personalizado en MobiControl (%CustomAttr:ApiKey%): así se rota desde la
+                // consola sin volver a desplegar el archivo en toda la flota. Si el atributo
+                // no existe, se usa la llave de respaldo escrita aquí abajo.
+                apiKeyAtributo: "%CustomAttr:ApiKey%",
+                apiKeyRespaldo: "dev-dispositivo-3f9a1c7e5b2d48a6",
+
+                ciudad: "Cali",
+                claveCola: "mcfirma.pendiente"
+            };
+
+            // ======================================================================
+            // VARIABLES QUE RESUELVE MOBICONTROL AL INSTALAR EL FORMULARIO
+            // Si alguna no se resuelve, llega tal cual ("%MODEL%") y el formulario la
+            // muestra como campo editable en vez de mandarla así a la base de datos.
+            // ======================================================================
+            var VARIABLES = {
+                deviceId: "%deviceid%",
+                usuario: "%CustomAttr:Usuario%",
+                cedula: "%CustomAttr:Cedula%",
+                fabricante: "%MANUFACTURER%",
+                modelo: "%MODEL%",
+                imei: "%imei%",
+                iccid: "%ICCID%",
+                numeroCelular: "%CustomAttr:Numero Celular%",
+                estado: "%CustomAttr:Estado%",
+                canal: "%CustomAttr:Canal%",
+                distrito: "%CustomAttr:Distrito%",
+                costo: "%CustomAttr:Costo%",
+                entregables: "%CustomAttr:Entregables%"
+            };
+
+            // Campos que se muestran en la tarjeta del equipo, todos de solo lectura.
+            // "mono" los pinta en tipografía monoespaciada (números largos que se leen mejor
+            // dígito a dígito) y "moneda" les da formato de pesos.
+            var CAMPOS = [
+                { clave: "fabricante", etiqueta: "Marca" },
+                { clave: "modelo", etiqueta: "Modelo" },
+                { clave: "imei", etiqueta: "IMEI", mono: true },
+                { clave: "iccid", etiqueta: "SIMCARD (ICCID)", mono: true },
+                { clave: "numeroCelular", etiqueta: "No. celular" },
+                { clave: "estado", etiqueta: "Estado" },
+                { clave: "canal", etiqueta: "Canal" },
+                { clave: "distrito", etiqueta: "Distrito" },
+                { clave: "costo", etiqueta: "Costo del equipo", moneda: true }
+            ];
+
+            var $ = function (id) { return document.getElementById(id); };
+
+            // ======================================================================
+            // UTILIDADES
+            // ======================================================================
+
+            /**
+             * Un marcador que MobiControl no alcanzó a reemplazar llega literal, con los dos
+             * signos de porcentaje. Tratarlo como dato válido es lo que llenaba la base con
+             * filas que decían "%CustomAttr:Costo%" en el campo del costo.
+             */
+            function sinResolver(valor) {
+                if (typeof valor !== "string") return true;
+                var v = valor.trim();
+                if (!v) return true;
+                if (v.charAt(0) === "%" && v.charAt(v.length - 1) === "%") return true;
+                return v === "N/A" || v === "n/a" || v === "null" || v === "-";
+            }
+
+            function valor(clave) {
+                return sinResolver(VARIABLES[clave]) ? "" : String(VARIABLES[clave]).trim();
+            }
+
+            function formatearMoneda(texto) {
+                var soloNumero = String(texto).replace(/[^\d]/g, "");
+                if (!soloNumero) return texto;
+                try {
+                    return new Intl.NumberFormat("es-CO", {
+                        style: "currency", currency: "COP", maximumFractionDigits: 0
+                    }).format(Number(soloNumero));
+                } catch (e) {
+                    return texto;
+                }
+            }
+
+            function fechaLarga(fecha) {
+                try {
+                    return new Intl.DateTimeFormat("es-CO", {
+                        day: "2-digit", month: "long", year: "numeric"
+                    }).format(fecha);
+                } catch (e) {
+                    return fecha.toLocaleDateString();
+                }
+            }
+
+            function mostrarAviso(tipo, titulo, texto) {
+                var caja = document.createElement("div");
+                caja.className = "aviso " + tipo;
+
+                var rutas = {
+                    alerta: "M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z",
+                    error: "M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z",
+                    info: "M12 16v-4M12 8h.01M22 12a10 10 0 11-20 0 10 10 0 0120 0z",
+                    exito: "M20 6L9 17l-5-5"
+                };
+
+                caja.innerHTML =
+                    '<svg class="aviso-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+                    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                    '<path d="' + rutas[tipo] + '"/></svg><p></p>';
+
+                var p = caja.querySelector("p");
+                if (titulo) {
+                    var fuerte = document.createElement("strong");
+                    fuerte.textContent = titulo;
+                    p.appendChild(fuerte);
+                }
+                p.appendChild(document.createTextNode(texto));
+
+                $("avisos").appendChild(caja);
+                return caja;
+            }
+
+            // ======================================================================
+            // TABLERO DE FIRMA
+            // Sustituye a signature_pad, que se descargaba de un CDN. Guarda los trazos como
+            // listas de puntos para poder redibujarlos: cuando el equipo rota, el canvas se
+            // redimensiona y con la implementación anterior la firma se borraba sola.
+            // ======================================================================
+            function TableroFirma(lienzo, alCambiar) {
+                var ctx = lienzo.getContext("2d");
+                var trazos = [];
+                var trazoActual = null;
+                var dibujando = false;
+
+                function ajustarTamano() {
+                    var proporcion = Math.max(window.devicePixelRatio || 1, 1);
+                    var ancho = lienzo.offsetWidth;
+                    var alto = lienzo.offsetHeight;
+                    if (!ancho || !alto) return;
+
+                    lienzo.width = Math.round(ancho * proporcion);
+                    lienzo.height = Math.round(alto * proporcion);
+                    ctx.setTransform(proporcion, 0, 0, proporcion, 0, 0);
+
+                    ctx.lineCap = "round";
+                    ctx.lineJoin = "round";
+                    ctx.strokeStyle = "#111827";
+                    ctx.lineWidth = 2.4;
+
+                    redibujar();
+                }
+
+                function redibujar() {
+                    ctx.clearRect(0, 0, lienzo.width, lienzo.height);
+                    for (var i = 0; i < trazos.length; i++) dibujarTrazo(trazos[i]);
+                }
+
+                /**
+                 * Curvas suaves en vez de segmentos rectos: se traza una cuadrática entre los
+                 * puntos medios de cada par. Con líneas rectas, una firma hecha con el dedo
+                 * quedaba angulosa y no se parecía a la del documento de identidad.
+                 */
+                function dibujarTrazo(puntos) {
+                    if (puntos.length === 0) return;
+
+                    ctx.beginPath();
+
+                    if (puntos.length < 3) {
+                        var p = puntos[0];
+                        ctx.arc(p.x, p.y, ctx.lineWidth / 2, 0, Math.PI * 2);
+                        ctx.fillStyle = ctx.strokeStyle;
+                        ctx.fill();
+                        return;
+                    }
+
+                    ctx.moveTo(puntos[0].x, puntos[0].y);
+                    for (var i = 1; i < puntos.length - 1; i++) {
+                        var medioX = (puntos[i].x + puntos[i + 1].x) / 2;
+                        var medioY = (puntos[i].y + puntos[i + 1].y) / 2;
+                        ctx.quadraticCurveTo(puntos[i].x, puntos[i].y, medioX, medioY);
+                    }
+                    ctx.lineTo(puntos[puntos.length - 1].x, puntos[puntos.length - 1].y);
+                    ctx.stroke();
+                }
+
+                function posicion(evento) {
+                    var caja = lienzo.getBoundingClientRect();
+                    return { x: evento.clientX - caja.left, y: evento.clientY - caja.top };
+                }
+
+                function iniciar(evento) {
+                    if (evento.button !== undefined && evento.button !== 0) return;
+                    evento.preventDefault();
+                    dibujando = true;
+                    trazoActual = [posicion(evento)];
+                    trazos.push(trazoActual);
+                    if (lienzo.setPointerCapture && evento.pointerId !== undefined) {
+                        lienzo.setPointerCapture(evento.pointerId);
+                    }
+                    redibujar();
+                    alCambiar();
+                }
+
+                function mover(evento) {
+                    if (!dibujando) return;
+                    evento.preventDefault();
+                    trazoActual.push(posicion(evento));
+                    redibujar();
+                }
+
+                function terminar(evento) {
+                    if (!dibujando) return;
+                    if (evento) evento.preventDefault();
+                    dibujando = false;
+                    trazoActual = null;
+                    alCambiar();
+                }
+
+                lienzo.addEventListener("pointerdown", iniciar);
+                lienzo.addEventListener("pointermove", mover);
+                lienzo.addEventListener("pointerup", terminar);
+                lienzo.addEventListener("pointercancel", terminar);
+                lienzo.addEventListener("pointerleave", terminar);
+
+                // El redimensionado se aplaza: en Android, girar el equipo dispara varios
+                // eventos seguidos y recalcular en cada uno hacía parpadear el trazo.
+                var temporizador = null;
+                window.addEventListener("resize", function () {
+                    clearTimeout(temporizador);
+                    temporizador = setTimeout(ajustarTamano, 120);
+                });
+                window.addEventListener("orientationchange", function () {
+                    setTimeout(ajustarTamano, 250);
+                });
+
+                setTimeout(ajustarTamano, 0);
+
+                return {
+                    estaVacia: function () { return trazos.length === 0; },
+                    borrar: function () {
+                        trazos = [];
+                        redibujar();
+                        alCambiar();
+                    },
+                    aPng: function () { return lienzo.toDataURL("image/png"); },
+                    ajustar: ajustarTamano
+                };
+            }
+
+            // ======================================================================
+            // ESTADO
+            // ======================================================================
+            var tablero = null;
+            var datosFaltantes = [];  // etiquetas de lo que MobiControl no alcanzó a enviar
+            var enviando = false;
+            var claveIdempotencia = null;
+            var ultimaRespuesta = null;
+
+            function apiKey() {
+                return sinResolver(CONFIG.apiKeyAtributo) ? CONFIG.apiKeyRespaldo : CONFIG.apiKeyAtributo.trim();
+            }
+
+            function url(ruta) {
+                return CONFIG.apiBaseUrl.replace(/\/+$/, "") + ruta;
+            }
+
+            /** Identificador estable del envío: el mismo en todos los reintentos. */
+            function nuevaClaveIdempotencia() {
+                var aleatorio = Math.random().toString(36).slice(2, 10);
+                return (valor("deviceId") || "sin-id") + "-" + Date.now() + "-" + aleatorio;
+            }
+
+            // ======================================================================
+            // PINTAR LA PANTALLA
+            // ======================================================================
+            function pintar() {
+                var hoy = new Date();
+                $("txt-fecha").textContent = fechaLarga(hoy);
+                $("txt-ciudad").textContent = CONFIG.ciudad;
+                $("txt-usuario").textContent = valor("usuario") || "—";
+                $("txt-cedula").textContent = valor("cedula") || "—";
+
+                var equipo = [valor("fabricante"), valor("modelo")].filter(Boolean).join(" ");
+                if (equipo) $("cab-detalle").textContent = equipo;
+
+                var rejilla = $("rejilla-datos");
+                CAMPOS.forEach(function (campo) {
+                    var celda = document.createElement("div");
+                    celda.className = "dato";
+
+                    var etiqueta = document.createElement("span");
+                    etiqueta.className = "dato-etiqueta";
+                    etiqueta.textContent = campo.etiqueta;
+                    celda.appendChild(etiqueta);
+
+                    var texto = valor(campo.clave);
+
+                    if (texto) {
+                        var span = document.createElement("span");
+                        span.className = "dato-valor" + (campo.mono ? " mono" : "");
+                        span.textContent = campo.moneda ? formatearMoneda(texto) : texto;
+                        celda.appendChild(span);
+                    } else {
+                        // Ni siquiera cuando el dato falta se abre a edición: el acta describe
+                        // el equipo según lo que MobiControl tiene registrado, y si eso se
+                        // pudiera escribir a mano aquí, el documento dejaría de coincidir con
+                        // el inventario. Lo que falta se corrige en la consola, no en el equipo.
+                        celda.className = "dato sin-dato";
+
+                        var faltante = document.createElement("span");
+                        faltante.className = "faltante";
+                        faltante.textContent = "Sin registrar";
+                        celda.appendChild(faltante);
+
+                        datosFaltantes.push(campo.etiqueta);
+                    }
+
+                    rejilla.appendChild(celda);
+                });
+
+                if (valor("entregables")) {
+                    $("txt-entregables").textContent = valor("entregables");
+                    $("tarjeta-entregables").hidden = false;
+                }
+
+                $("campo-nombre").value = valor("usuario");
+            }
+
+            function revisarAvisos() {
+                if (!valor("deviceId")) {
+                    mostrarAviso("error", "No se pudo identificar el equipo. ",
+                        "MobiControl no envió el identificador del dispositivo, así que el acta no se puede " +
+                        "registrar. Reinstala el formulario desde la consola antes de continuar.");
+                    $("btn-enviar").disabled = true;
+                }
+
+                if (datosFaltantes.length > 0) {
+                    mostrarAviso("alerta", "Datos del equipo sin registrar. ",
+                        "MobiControl no reportó: " + datosFaltantes.join(", ") + ". El acta se puede " +
+                        "firmar igual, pero esos campos quedarán vacíos. Para completarlos hay que " +
+                        "cargarlos en la consola de MobiControl y volver a abrir el formulario.");
+                }
+
+                if (!valor("cedula")) {
+                    mostrarAviso("alerta", "Falta la cédula. ",
+                        "El acta necesita la cédula del asociado. Comunícate con TI para cargarla en MobiControl.");
+                }
+            }
+
+            /** Avisa si el equipo ya tiene un acta firmada, para no duplicar la entrega. */
+            function consultarEstadoPrevio() {
+                var id = valor("deviceId");
+                if (!id) return;
+
+                fetch(url("/api/v1/entregas/dispositivo/" + encodeURIComponent(id)), {
+                    headers: { "X-Api-Key": apiKey() }
+                }).then(function (respuesta) {
+                    return respuesta.ok ? respuesta.json() : null;
+                }).then(function (datos) {
+                    if (datos && datos.yaFirmado) {
+                        var fecha = new Date(datos.fechaFirma);
+                        mostrarAviso("info", "Este equipo ya tiene un acta. ",
+                            "Fue firmada por " + (datos.nombreAsociadoFirmante || "un asociado") +
+                            " el " + fechaLarga(fecha) + ". Si vas a entregarlo de nuevo, puedes firmar otra vez.");
+                    }
+                }).catch(function () {
+                    // Sin conexión no pasa nada: es solo un aviso, la firma no depende de esto.
+                });
+            }
+
+            // ======================================================================
+            // ENVÍO
+            // ======================================================================
+            function armarPayload() {
+                // El único dato que escribe una persona es el nombre del firmante. Todo lo
+                // demás sale tal cual de MobiControl, sin paso intermedio donde alterarlo.
+                var dato = valor;
+
+                return {
+                    deviceId: valor("deviceId"),
+                    cedula: valor("cedula"),
+                    usuario: valor("usuario"),
+                    nombreAsociado: $("campo-nombre").value.trim(),
+                    fabricante: dato("fabricante"),
+                    modelo: dato("modelo"),
+                    imei: dato("imei"),
+                    iccid: dato("iccid"),
+                    numeroCelular: dato("numeroCelular"),
+                    estado: dato("estado"),
+                    canal: dato("canal"),
+                    distrito: dato("distrito"),
+                    costo: dato("costo"),
+                    entregables: valor("entregables"),
+                    ciudadFirma: CONFIG.ciudad,
+                    firmaBase64: tablero.aPng(),
+                    claveIdempotencia: claveIdempotencia,
+                    sincronizarMobiControl: true
+                };
+            }
+
+            function validar() {
+                var nombre = $("campo-nombre");
+                if (!nombre.value.trim()) {
+                    nombre.classList.add("invalido");
+                    nombre.focus();
+                    alert("Escribe el nombre del asociado antes de firmar.");
+                    return false;
+                }
+                nombre.classList.remove("invalido");
+
+                if (tablero.estaVacia()) {
+                    alert("Por favor firma antes de enviar.");
+                    $("marco-firma").scrollIntoView({ behavior: "smooth", block: "center" });
+                    return false;
+                }
+
+                if (!valor("cedula")) {
+                    alert("El acta no tiene la cédula del asociado y no se puede registrar. Comunícate con TI.");
+                    return false;
+                }
+
+                return true;
+            }
+
+            function enviar(payload) {
+                return fetch(url("/api/v1/entregas"), {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Api-Key": apiKey()
+                    },
+                    body: JSON.stringify(payload)
+                }).then(function (respuesta) {
+                    return respuesta.text().then(function (texto) {
+                        var cuerpo = null;
+                        try { cuerpo = texto ? JSON.parse(texto) : null; } catch (e) { cuerpo = null; }
+
+                        if (!respuesta.ok) {
+                            var mensaje = (cuerpo && (cuerpo.message || cuerpo.title)) ||
+                                ("El servidor respondió " + respuesta.status + ".");
+                            var error = new Error(mensaje);
+                            error.delServidor = true;
+                            throw error;
+                        }
+
+                        return cuerpo;
+                    });
+                });
+            }
+
+            function guardarPendiente(payload) {
+                try {
+                    localStorage.setItem(CONFIG.claveCola, JSON.stringify({
+                        payload: payload,
+                        guardadoEn: new Date().toISOString()
+                    }));
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            function limpiarPendiente() {
+                try { localStorage.removeItem(CONFIG.claveCola); } catch (e) { /* sin espacio, da igual */ }
+            }
+
+            /**
+             * Reenvía un acta que se quedó guardada por falta de red. La clave de idempotencia
+             * viaja en el propio payload, así que si el envío original sí había llegado, el API
+             * devuelve el acta existente en lugar de registrarla dos veces.
+             */
+            function reintentarPendiente() {
+                var crudo = null;
+                try { crudo = localStorage.getItem(CONFIG.claveCola); } catch (e) { return; }
+                if (!crudo) return;
+
+                var guardado;
+                try { guardado = JSON.parse(crudo); } catch (e) { limpiarPendiente(); return; }
+                if (!guardado || !guardado.payload) { limpiarPendiente(); return; }
+
+                enviar(guardado.payload).then(function (respuesta) {
+                    limpiarPendiente();
+                    ultimaRespuesta = respuesta;
+                    mostrarFinal(respuesta, true);
+                }).catch(function (error) {
+                    // Un rechazo del servidor no se va a arreglar reintentando: se descarta la
+                    // cola para no dejar al asociado con un aviso permanente que nunca se cierra.
+                    if (error.delServidor) limpiarPendiente();
+                });
+            }
+
+            function mostrarFinal(respuesta, esReenvio) {
+                $("capa-cargando").hidden = true;
+                $("pantalla-final").hidden = false;
+
+                var numero = String(respuesta.entregaUid || "").slice(0, 8).toUpperCase();
+                $("final-numero").textContent = "Acta No. " + (numero || "—");
+
+                if (respuesta.duplicada || esReenvio) {
+                    $("final-titulo").textContent = "Acta ya registrada";
+                    $("final-texto").textContent =
+                        "Esta entrega ya estaba guardada en el servidor. No se creó un acta duplicada.";
+                } else if (respuesta.estadoProceso === "SINCRONIZADO") {
+                    $("final-texto").textContent = "La entrega quedó firmada y sincronizada con MobiControl.";
+                } else {
+                    $("final-texto").textContent =
+                        "Tu firma quedó guardada. La sincronización con MobiControl se completará más tarde; " +
+                        "no necesitas hacer nada.";
+                }
+
+                $("btn-ver-pdf").onclick = function () {
+                    abrirPdf(respuesta.entregaUid);
+                };
+            }
+
+            /**
+             * Descarga el PDF con la llave en la cabecera y lo abre desde memoria. Se hace así
+             * y no con un enlace directo para no dejar la llave de acceso escrita en la URL,
+             * donde quedaría registrada en el historial y en los logs del servidor.
+             */
+            function abrirPdf(entregaUid) {
+                var boton = $("btn-ver-pdf");
+                boton.disabled = true;
+
+                fetch(url("/api/v1/entregas/" + entregaUid + "/pdf"), {
+                    headers: { "X-Api-Key": apiKey() }
+                }).then(function (respuesta) {
+                    if (!respuesta.ok) throw new Error("No se pudo obtener el acta.");
+                    return respuesta.blob();
+                }).then(function (blob) {
+                    var direccion = URL.createObjectURL(blob);
+                    var ventana = window.open(direccion, "_blank");
+                    if (!ventana) location.href = direccion;
+                    setTimeout(function () { URL.revokeObjectURL(direccion); }, 60000);
+                }).catch(function () {
+                    alert("No se pudo abrir el acta en este momento. Quedó guardada en el servidor.");
+                }).finally(function () {
+                    boton.disabled = false;
+                });
+            }
+
+            function procesarEnvio() {
+                if (enviando) return;
+                enviando = true;
+
+                $("capa-confirmar").hidden = true;
+                $("capa-cargando").hidden = false;
+
+                if (!claveIdempotencia) claveIdempotencia = nuevaClaveIdempotencia();
+                var payload = armarPayload();
+
+                enviar(payload).then(function (respuesta) {
+                    limpiarPendiente();
+                    ultimaRespuesta = respuesta;
+                    mostrarFinal(respuesta, false);
+                }).catch(function (error) {
+                    $("capa-cargando").hidden = true;
+
+                    if (error.delServidor) {
+                        // El API entendió la petición y la rechazó: reintentar no cambia nada.
+                        alert("No se pudo registrar el acta.\n\n" + error.message);
+                    } else if (guardarPendiente(payload)) {
+                        // Falló la red. La firma no se pierde: queda en el equipo y se reenvía
+                        // sola en cuanto vuelva la conexión o se abra otra vez el formulario.
+                        alert("No hay conexión con el servidor.\n\nTu firma quedó guardada en el equipo y se " +
+                            "enviará automáticamente cuando vuelva la red. Puedes cerrar el formulario.");
+                        mostrarAviso("alerta", "Acta pendiente de envío. ",
+                            "Se reintentará automáticamente al recuperar la conexión.");
+                    } else {
+                        alert("No hay conexión con el servidor y no se pudo guardar el acta en el equipo. " +
+                            "Vuelve a intentarlo cuando tengas señal.");
+                    }
+                }).finally(function () {
+                    enviando = false;
+                });
+            }
+
+            // ======================================================================
+            // ARRANQUE
+            // ======================================================================
+            function actualizarBotonEnviar() {
+                var listo = $("chk-acepto").checked && tablero && !tablero.estaVacia();
+                $("btn-enviar").disabled = !listo || !valor("deviceId");
+            }
+
+            function iniciar() {
+                pintar();
+
+                tablero = TableroFirma($("lienzo-firma"), function () {
+                    $("marco-firma").classList.toggle("firmado", !tablero.estaVacia());
+                    actualizarBotonEnviar();
+                });
+
+                // Los controles se conectan SIEMPRE, incluso cuando faltan datos críticos.
+                // Antes se cortaba aquí si no llegaba el identificador del equipo, y el efecto
+                // era que el botón de borrar la firma quedaba muerto: el lienzo sí respondía
+                // (sus eventos se registran dentro del tablero), pero no había forma de
+                // rehacer un trazo mal hecho. Quien decide si se puede enviar es
+                // actualizarBotonEnviar, no el registro de eventos.
+                $("btn-borrar").addEventListener("click", function () { tablero.borrar(); });
+                $("chk-acepto").addEventListener("change", actualizarBotonEnviar);
+
+                $("btn-enviar").addEventListener("click", function () {
+                    if (!validar()) return;
+                    $("capa-confirmar").hidden = false;
+                });
+
+                $("btn-cancelar").addEventListener("click", function () {
+                    $("capa-confirmar").hidden = true;
+                });
+
+                $("btn-confirmar").addEventListener("click", procesarEnvio);
+
+                // Si el asociado ya firmó pero el envío no salió, se reintenta al abrir y
+                // cuando el sistema avisa que volvió la conexión.
+                reintentarPendiente();
+                window.addEventListener("online", reintentarPendiente);
+
+                revisarAvisos();
+                consultarEstadoPrevio();
+            }
+
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", iniciar);
+            } else {
+                iniciar();
+            }
+        })();
+    </script>
+</body>
+
+</html>
