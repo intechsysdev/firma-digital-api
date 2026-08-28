@@ -1,0 +1,15 @@
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Application\bin\Debug\net10.0\MobiControlFirma.Application.deps.json
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Application\bin\Debug\net10.0\MobiControlFirma.Application.dll
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Application\bin\Debug\net10.0\MobiControlFirma.Application.pdb
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Application\bin\Debug\net10.0\MobiControlFirma.Domain.dll
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Application\bin\Debug\net10.0\MobiControlFirma.Domain.pdb
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Application\obj\Debug\net10.0\MobiControlFirma.Application.csproj.AssemblyReference.cache
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Application\obj\Debug\net10.0\MobiControlFirma.Application.GeneratedMSBuildEditorConfig.editorconfig
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Application\obj\Debug\net10.0\MobiControlFirma.Application.AssemblyInfoInputs.cache
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Application\obj\Debug\net10.0\MobiControlFirma.Application.AssemblyInfo.cs
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Application\obj\Debug\net10.0\MobiControlFirma.Application.csproj.CoreCompileInputs.cache
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Application\obj\Debug\net10.0\MobiCont.4DCFF3F5.Up2Date
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Application\obj\Debug\net10.0\MobiControlFirma.Application.dll
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Application\obj\Debug\net10.0\refint\MobiControlFirma.Application.dll
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Application\obj\Debug\net10.0\MobiControlFirma.Application.pdb
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Application\obj\Debug\net10.0\ref\MobiControlFirma.Application.dll

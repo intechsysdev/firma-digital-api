@@ -1,0 +1,11 @@
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Domain\bin\Debug\net10.0\MobiControlFirma.Domain.deps.json
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Domain\bin\Debug\net10.0\MobiControlFirma.Domain.dll
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Domain\bin\Debug\net10.0\MobiControlFirma.Domain.pdb
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Domain\obj\Debug\net10.0\MobiControlFirma.Domain.GeneratedMSBuildEditorConfig.editorconfig
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Domain\obj\Debug\net10.0\MobiControlFirma.Domain.AssemblyInfoInputs.cache
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Domain\obj\Debug\net10.0\MobiControlFirma.Domain.AssemblyInfo.cs
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Domain\obj\Debug\net10.0\MobiControlFirma.Domain.csproj.CoreCompileInputs.cache
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Domain\obj\Debug\net10.0\MobiControlFirma.Domain.dll
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Domain\obj\Debug\net10.0\refint\MobiControlFirma.Domain.dll
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Domain\obj\Debug\net10.0\MobiControlFirma.Domain.pdb
+F:\Intechsys_Proj\Firma_Digital\firma_be\MobiControlFirma.Domain\obj\Debug\net10.0\ref\MobiControlFirma.Domain.dll

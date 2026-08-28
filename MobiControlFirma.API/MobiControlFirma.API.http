@@ -1,0 +1,6 @@
+@MobiControlFirma.API_HostAddress = http://localhost:5234
+
+GET {{MobiControlFirma.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
