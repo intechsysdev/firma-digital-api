@@ -35,16 +35,45 @@ jobs:
           name: .net-app
           path: ${{env.DOTNET_ROOT}}/myapp
 
-  deploy:
+  # Las migraciones se aplican antes de desplegar: si el esquema falla, el App Service se queda
+  # con la versión anterior funcionando en vez de arrancar contra una base que no le corresponde.
+  migrate:
     runs-on: ubuntu-latest
     needs: build
-    
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET Core
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+
+      - name: Instalar dotnet-ef
+        run: dotnet tool install --global dotnet-ef --version 10.*
+
+      # La cadena sale de appsettings.json, el mismo del commit que dispara el workflow: la base
+      # queda siempre en el esquema de la versión que se está desplegando.
+      - name: Aplicar migraciones a Azure SQL
+        env:
+          ASPNETCORE_ENVIRONMENT: Production
+        run: |
+          dotnet ef database update \
+            --project MobiControlFirma.Infrastructure \
+            --startup-project MobiControlFirma.API
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [build, migrate]
+
     steps:
       - name: Download artifact from build job
         uses: actions/download-artifact@v4
         with:
           name: .net-app
-      
+
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3

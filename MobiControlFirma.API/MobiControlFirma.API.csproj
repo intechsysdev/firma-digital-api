@@ -20,4 +20,11 @@
     <ProjectReference Include="..\MobiControlFirma.Infrastructure\MobiControlFirma.Infrastructure.csproj" />
   </ItemGroup>
 
+  <!-- La configuración de desarrollo apunta al SQL del equipo. Si viaja en el publicado y el
+       App Service quedara con ASPNETCORE_ENVIRONMENT=Development, el API migraría contra un
+       servidor inalcanzable en vez de la base de Azure, y arrancaría con las llaves de prueba. -->
+  <ItemGroup>
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
 </Project>
