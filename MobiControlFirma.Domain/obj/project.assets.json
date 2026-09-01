@@ -1,8 +1,7 @@
 {
   "version": 4,
   "targets": {
-    "net10.0": {},
-    "net10.0/linux-x64": {}
+    "net10.0": {}
   },
   "libraries": {},
   "projectFileDependencyGroups": {
@@ -359,11 +358,6 @@
           "System.Xml.XPath": "(,4.3.32767]",
           "System.Xml.XPath.XDocument": "(,5.0.32767]"
         }
-      }
-    },
-    "runtimes": {
-      "linux-x64": {
-        "#import": []
       }
     }
   }

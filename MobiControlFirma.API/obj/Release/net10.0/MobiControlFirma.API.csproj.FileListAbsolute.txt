@@ -206,7 +206,6 @@ F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\obj\Relea
 F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\obj\Release\net10.0\staticwebassets.development.json
 F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\obj\Release\net10.0\staticwebassets.build.endpoints.json
 F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\obj\Release\net10.0\swae.build.ex.cache
-F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\obj\Release\net10.0\staticwebassets.upToDateCheck.txt
 F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\obj\Release\net10.0\MobiCont.C41B805D.Up2Date
 F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\obj\Release\net10.0\MobiControlFirma.API.dll
 F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\obj\Release\net10.0\refint\MobiControlFirma.API.dll

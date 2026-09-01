@@ -360,11 +360,6 @@
             "System.Xml.XPath.XDocument": "(,5.0.32767]"
           }
         }
-      },
-      "runtimes": {
-        "linux-x64": {
-          "#import": []
-        }
       }
     },
     "F:\\Intechsys_Proj\\Firma_Digital\\firma-digital-api\\MobiControlFirma.Domain\\MobiControlFirma.Domain.csproj": {
@@ -712,11 +707,6 @@
             "System.Xml.XPath": "(,4.3.32767]",
             "System.Xml.XPath.XDocument": "(,5.0.32767]"
           }
-        }
-      },
-      "runtimes": {
-        "linux-x64": {
-          "#import": []
         }
       }
     }
