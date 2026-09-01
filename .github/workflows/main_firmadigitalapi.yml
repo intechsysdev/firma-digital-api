@@ -54,6 +54,12 @@ jobs:
       - name: Instalar dotnet-ef
         run: dotnet tool install --global dotnet-ef --version 10.*
 
+      # La carpeta obj/ está versionada y sus project.assets.json guardan rutas de Windows.
+      # dotnet ef no restaura por su cuenta, así que sin esto lee esos archivos y muere
+      # buscando la carpeta de paquetes de Visual Studio, que en el runner de Linux no existe.
+      - name: Restaurar dependencias
+        run: dotnet restore MobiControlFirma.sln
+
       # La cadena sale de appsettings.json, el mismo del commit que dispara el workflow: la base
       # queda siempre en el esquema de la versión que se está desplegando.
       - name: Aplicar migraciones a Azure SQL
