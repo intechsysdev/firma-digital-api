@@ -1,0 +1,71 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "F:\\Intechsys_Proj\\Firma_Digital\\firma-digital-api\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{791C0FC6-2CA2-4BD1-91E7-744C4CBFD1E8}|MobiControlFirma.API\\MobiControlFirma.API.csproj|f:\\intechsys_proj\\firma_digital\\firma-digital-api\\mobicontrolfirma.api\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{791C0FC6-2CA2-4BD1-91E7-744C4CBFD1E8}|MobiControlFirma.API\\MobiControlFirma.API.csproj|solutionrelative:mobicontrolfirma.api\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 6,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{67d15d2e-5bac-311f-82c3-d49feab601fd}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{65ddf8c3-8f89-4077-a6c6-dbb8853aab13}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:2031669256:0:{bf84ea66-d821-4dba-b1b1-2777d8574775}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:1:0:{fabf9319-47eb-497e-b8f6-d9f73fba5f55}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:14:0:{2456bd12-ecf7-4988-a4a6-67d49173f565}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "appsettings.json",
+              "DocumentMoniker": "F:\\Intechsys_Proj\\Firma_Digital\\firma-digital-api\\MobiControlFirma.API\\appsettings.json",
+              "RelativeDocumentMoniker": "MobiControlFirma.API\\appsettings.json",
+              "ToolTip": "F:\\Intechsys_Proj\\Firma_Digital\\firma-digital-api\\MobiControlFirma.API\\appsettings.json",
+              "RelativeToolTip": "MobiControlFirma.API\\appsettings.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAAYAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2026-09-01T22:25:29.612Z",
+              "EditorCaption": ""
+            }
+          ]
+        },
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": -1,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:13:0:{2456bd12-ecf7-4988-a4a6-67d49173f565}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

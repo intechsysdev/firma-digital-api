@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "y8CB6dPU9NQ=",
+  "dgSpecHash": "NpbGWa1kM1Q=",
   "success": true,
-  "projectFilePath": "F:\\Intechsys_Proj\\Firma_Digital\\firma_be\\MobiControlFirma.Infrastructure\\MobiControlFirma.Infrastructure.csproj",
+  "projectFilePath": "F:\\Intechsys_Proj\\Firma_Digital\\firma-digital-api\\MobiControlFirma.Infrastructure\\MobiControlFirma.Infrastructure.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Jeffo-PC\\.nuget\\packages\\azure.core\\1.55.0\\azure.core.1.55.0.nupkg.sha512",
     "C:\\Users\\Jeffo-PC\\.nuget\\packages\\azure.identity\\1.17.1\\azure.identity.1.17.1.nupkg.sha512",

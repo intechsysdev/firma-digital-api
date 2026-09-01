@@ -3965,11 +3965,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "F:\\Intechsys_Proj\\Firma_Digital\\firma_be\\MobiControlFirma.API\\MobiControlFirma.API.csproj",
+      "projectUniqueName": "F:\\Intechsys_Proj\\Firma_Digital\\firma-digital-api\\MobiControlFirma.API\\MobiControlFirma.API.csproj",
       "projectName": "MobiControlFirma.API",
-      "projectPath": "F:\\Intechsys_Proj\\Firma_Digital\\firma_be\\MobiControlFirma.API\\MobiControlFirma.API.csproj",
+      "projectPath": "F:\\Intechsys_Proj\\Firma_Digital\\firma-digital-api\\MobiControlFirma.API\\MobiControlFirma.API.csproj",
       "packagesPath": "C:\\Users\\Jeffo-PC\\.nuget\\packages\\",
-      "outputPath": "F:\\Intechsys_Proj\\Firma_Digital\\firma_be\\MobiControlFirma.API\\obj\\",
+      "outputPath": "F:\\Intechsys_Proj\\Firma_Digital\\firma-digital-api\\MobiControlFirma.API\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages",
@@ -3998,11 +3998,11 @@
           "framework": "net10.0",
           "targetAlias": "net10.0",
           "projectReferences": {
-            "F:\\Intechsys_Proj\\Firma_Digital\\firma_be\\MobiControlFirma.Application\\MobiControlFirma.Application.csproj": {
-              "projectPath": "F:\\Intechsys_Proj\\Firma_Digital\\firma_be\\MobiControlFirma.Application\\MobiControlFirma.Application.csproj"
+            "F:\\Intechsys_Proj\\Firma_Digital\\firma-digital-api\\MobiControlFirma.Application\\MobiControlFirma.Application.csproj": {
+              "projectPath": "F:\\Intechsys_Proj\\Firma_Digital\\firma-digital-api\\MobiControlFirma.Application\\MobiControlFirma.Application.csproj"
             },
-            "F:\\Intechsys_Proj\\Firma_Digital\\firma_be\\MobiControlFirma.Infrastructure\\MobiControlFirma.Infrastructure.csproj": {
-              "projectPath": "F:\\Intechsys_Proj\\Firma_Digital\\firma_be\\MobiControlFirma.Infrastructure\\MobiControlFirma.Infrastructure.csproj"
+            "F:\\Intechsys_Proj\\Firma_Digital\\firma-digital-api\\MobiControlFirma.Infrastructure\\MobiControlFirma.Infrastructure.csproj": {
+              "projectPath": "F:\\Intechsys_Proj\\Firma_Digital\\firma-digital-api\\MobiControlFirma.Infrastructure\\MobiControlFirma.Infrastructure.csproj"
             }
           }
         }

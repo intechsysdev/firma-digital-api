@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "DSBiQx1ImXs=",
+  "dgSpecHash": "ATBDX2igp7s=",
   "success": true,
-  "projectFilePath": "F:\\Intechsys_Proj\\Firma_Digital\\firma_be\\MobiControlFirma.Domain\\MobiControlFirma.Domain.csproj",
+  "projectFilePath": "F:\\Intechsys_Proj\\Firma_Digital\\firma-digital-api\\MobiControlFirma.Domain\\MobiControlFirma.Domain.csproj",
   "expectedPackageFiles": [],
   "logs": []
 }

@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "5G8QOkzAPJY=",
+  "dgSpecHash": "jLWxBp1a/7I=",
   "success": true,
-  "projectFilePath": "F:\\Intechsys_Proj\\Firma_Digital\\firma_be\\MobiControlFirma.Application\\MobiControlFirma.Application.csproj",
+  "projectFilePath": "F:\\Intechsys_Proj\\Firma_Digital\\firma-digital-api\\MobiControlFirma.Application\\MobiControlFirma.Application.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Jeffo-PC\\.nuget\\packages\\microsoft.entityframeworkcore\\10.0.11\\microsoft.entityframeworkcore.10.0.11.nupkg.sha512",
     "C:\\Users\\Jeffo-PC\\.nuget\\packages\\microsoft.entityframeworkcore.abstractions\\10.0.11\\microsoft.entityframeworkcore.abstractions.10.0.11.nupkg.sha512",
