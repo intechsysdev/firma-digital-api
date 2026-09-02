@@ -1,0 +1,15 @@
+C:\Users\Jeffo-PC\AppData\Local\Temp\claude\f--Intechsys-Proj-Firma-Digital\2d42a596-e09d-4d30-8bad-dd394a2d5031\scratchpad\slnpub\MobiControlFirma.Application.dll
+C:\Users\Jeffo-PC\AppData\Local\Temp\claude\f--Intechsys-Proj-Firma-Digital\2d42a596-e09d-4d30-8bad-dd394a2d5031\scratchpad\slnpub\MobiControlFirma.Application.deps.json
+C:\Users\Jeffo-PC\AppData\Local\Temp\claude\f--Intechsys-Proj-Firma-Digital\2d42a596-e09d-4d30-8bad-dd394a2d5031\scratchpad\slnpub\MobiControlFirma.Application.pdb
+C:\Users\Jeffo-PC\AppData\Local\Temp\claude\f--Intechsys-Proj-Firma-Digital\2d42a596-e09d-4d30-8bad-dd394a2d5031\scratchpad\slnpub\Microsoft.EntityFrameworkCore.dll
+C:\Users\Jeffo-PC\AppData\Local\Temp\claude\f--Intechsys-Proj-Firma-Digital\2d42a596-e09d-4d30-8bad-dd394a2d5031\scratchpad\slnpub\Microsoft.EntityFrameworkCore.Abstractions.dll
+C:\Users\Jeffo-PC\AppData\Local\Temp\claude\f--Intechsys-Proj-Firma-Digital\2d42a596-e09d-4d30-8bad-dd394a2d5031\scratchpad\slnpub\Microsoft.Extensions.Caching.Abstractions.dll
+C:\Users\Jeffo-PC\AppData\Local\Temp\claude\f--Intechsys-Proj-Firma-Digital\2d42a596-e09d-4d30-8bad-dd394a2d5031\scratchpad\slnpub\Microsoft.Extensions.Caching.Memory.dll
+C:\Users\Jeffo-PC\AppData\Local\Temp\claude\f--Intechsys-Proj-Firma-Digital\2d42a596-e09d-4d30-8bad-dd394a2d5031\scratchpad\slnpub\Microsoft.Extensions.DependencyInjection.dll
+C:\Users\Jeffo-PC\AppData\Local\Temp\claude\f--Intechsys-Proj-Firma-Digital\2d42a596-e09d-4d30-8bad-dd394a2d5031\scratchpad\slnpub\Microsoft.Extensions.DependencyInjection.Abstractions.dll
+C:\Users\Jeffo-PC\AppData\Local\Temp\claude\f--Intechsys-Proj-Firma-Digital\2d42a596-e09d-4d30-8bad-dd394a2d5031\scratchpad\slnpub\Microsoft.Extensions.Logging.dll
+C:\Users\Jeffo-PC\AppData\Local\Temp\claude\f--Intechsys-Proj-Firma-Digital\2d42a596-e09d-4d30-8bad-dd394a2d5031\scratchpad\slnpub\Microsoft.Extensions.Logging.Abstractions.dll
+C:\Users\Jeffo-PC\AppData\Local\Temp\claude\f--Intechsys-Proj-Firma-Digital\2d42a596-e09d-4d30-8bad-dd394a2d5031\scratchpad\slnpub\Microsoft.Extensions.Options.dll
+C:\Users\Jeffo-PC\AppData\Local\Temp\claude\f--Intechsys-Proj-Firma-Digital\2d42a596-e09d-4d30-8bad-dd394a2d5031\scratchpad\slnpub\Microsoft.Extensions.Primitives.dll
+C:\Users\Jeffo-PC\AppData\Local\Temp\claude\f--Intechsys-Proj-Firma-Digital\2d42a596-e09d-4d30-8bad-dd394a2d5031\scratchpad\slnpub\MobiControlFirma.Domain.dll
+C:\Users\Jeffo-PC\AppData\Local\Temp\claude\f--Intechsys-Proj-Firma-Digital\2d42a596-e09d-4d30-8bad-dd394a2d5031\scratchpad\slnpub\MobiControlFirma.Domain.pdb

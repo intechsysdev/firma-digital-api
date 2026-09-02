@@ -1,0 +1,3 @@
+C:\Users\Jeffo-PC\AppData\Local\Temp\claude\f--Intechsys-Proj-Firma-Digital\2d42a596-e09d-4d30-8bad-dd394a2d5031\scratchpad\slnpub\MobiControlFirma.Domain.dll
+C:\Users\Jeffo-PC\AppData\Local\Temp\claude\f--Intechsys-Proj-Firma-Digital\2d42a596-e09d-4d30-8bad-dd394a2d5031\scratchpad\slnpub\MobiControlFirma.Domain.deps.json
+C:\Users\Jeffo-PC\AppData\Local\Temp\claude\f--Intechsys-Proj-Firma-Digital\2d42a596-e09d-4d30-8bad-dd394a2d5031\scratchpad\slnpub\MobiControlFirma.Domain.pdb
