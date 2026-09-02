@@ -902,8 +902,10 @@
             // CONFIGURACIÓN
             // ======================================================================
             var CONFIG = {
-                // URL del API. En producción se apunta al servidor donde queda publicado.
-                apiBaseUrl: "http://localhost:5234",
+                // URL del API. Siempre https: el formulario se abre desde el disco del
+                // equipo y el App Service redirige http a https, pero un preflight de CORS no
+                // sigue redirecciones, así que con http las peticiones fallan antes de salir.
+                apiBaseUrl: "https://firmadigitalapi-dbg4dgbvfbgpekg4.centralus-01.azurewebsites.net",
 
                 // Llave de acceso del formulario. Lo ideal es publicarla como atributo
                 // personalizado en MobiControl (%CustomAttr:ApiKey%): así se rota desde la
