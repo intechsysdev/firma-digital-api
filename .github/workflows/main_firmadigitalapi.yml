@@ -26,8 +26,12 @@ jobs:
       - name: Build with dotnet
         run: dotnet build --configuration Release
 
+      # Solo el API. Publicar la solución entera mete en la misma carpeta el
+      # runtimeconfig.json de Infrastructure (declara FrameworkReference de ASP.NET Core), y con
+      # dos candidatos App Service no sabe qué ensamblado arrancar: deja el contenedor de
+      # bienvenida corriendo y toda ruta responde 404 aunque el despliegue diga correcto.
       - name: dotnet publish
-        run: dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/myapp
+        run: dotnet publish MobiControlFirma.API/MobiControlFirma.API.csproj -c Release -o ${{env.DOTNET_ROOT}}/myapp
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
