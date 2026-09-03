@@ -91,6 +91,12 @@ jobs:
           app-name: 'firmadigitalapi'
           slot-name: 'Production'
           package: .
+          # OneDeploy fusiona sobre lo que ya hay en wwwroot en vez de reemplazarlo. Sin esto
+          # sobrevivía el runtimeconfig.json de Infrastructure de un despliegue anterior, y con
+          # dos candidatos App Service no sabía qué arrancar: el sitio se quedó sirviendo la
+          # página de bienvenida aunque los archivos nuevos ya estaban arriba.
+          clean: true
+          restart: true
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_A06969EB92CB4137BD6B4C0C9516B643 }}
 
       # TEMPORAL. El despliegue termina correcto pero el sitio nunca arranca lo desplegado:
