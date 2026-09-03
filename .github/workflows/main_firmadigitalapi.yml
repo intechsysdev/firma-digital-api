@@ -92,3 +92,61 @@ jobs:
           slot-name: 'Production'
           package: .
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_A06969EB92CB4137BD6B4C0C9516B643 }}
+
+      # TEMPORAL. El despliegue termina correcto pero el sitio nunca arranca lo desplegado:
+      # sigue respondiendo el contenedor de bienvenida. Esto pregunta a Kudu si los archivos
+      # llegaron a wwwroot y qué dice el arranque. Quitar cuando el API responda.
+      - name: Diagnóstico Kudu
+        if: always()
+        env:
+          PERFIL: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_A06969EB92CB4137BD6B4C0C9516B643 }}
+        run: |
+          CREDS=$(python3 -c "
+          import os, xml.etree.ElementTree as ET
+          raiz = ET.fromstring(os.environ['PERFIL'])
+          perfil = [x for x in raiz.iter('publishProfile') if x.get('publishMethod') == 'MSDeploy'][0]
+          print(perfil.get('publishUrl').split(':')[0])
+          print(perfil.get('userName'))
+          print(perfil.get('userPWD'))
+          ")
+          SCM=$(printf '%s\n' "$CREDS" | sed -n 1p)
+          USUARIO=$(printf '%s\n' "$CREDS" | sed -n 2p)
+          CLAVE=$(printf '%s\n' "$CREDS" | sed -n 3p)
+          echo "::add-mask::$USUARIO"
+          echo "::add-mask::$CLAVE"
+          # Nada de esto debe imprimir contraseñas: el repositorio es público.
+          CENSURA='s/[Pp]assword=[^;"]*/Password=***/g'
+
+          echo "===== SCM: $SCM ====="
+
+          echo "===== contenido de /home/site/wwwroot ====="
+          curl -s -u "$USUARIO:$CLAVE" "https://$SCM/api/vfs/site/wwwroot/" | python3 -c "
+          import json, sys
+          try:
+              datos = json.load(sys.stdin)
+          except Exception:
+              print('(respuesta no interpretable)'); raise SystemExit
+          print('archivos:', len(datos))
+          for i in sorted(datos, key=lambda x: x['name'])[:40]:
+              print('  {:>12}  {}'.format(i.get('size', ''), i['name']))
+          " || echo "(no se pudo listar wwwroot)"
+
+          echo "===== /home/data/SitePackages (existe si corre desde paquete) ====="
+          curl -s -o /dev/null -w "  http=%{http_code}\n" -u "$USUARIO:$CLAVE" \
+            "https://$SCM/api/vfs/data/SitePackages/" || true
+
+          echo "===== log de arranque del contenedor ====="
+          HREF=$(curl -s -u "$USUARIO:$CLAVE" "https://$SCM/api/logs/docker" | python3 -c "
+          import json, sys
+          try:
+              datos = json.load(sys.stdin)
+          except Exception:
+              datos = []
+          datos.sort(key=lambda x: x.get('mtime', ''), reverse=True)
+          print(datos[0]['href'] if datos else '')
+          ")
+          if [ -n "$HREF" ]; then
+            curl -s -u "$USUARIO:$CLAVE" "$HREF" | sed "$CENSURA" | tail -80
+          else
+            echo "(sin logs de contenedor disponibles)"
+          fi
