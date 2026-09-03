@@ -119,23 +119,36 @@ jobs:
 
           echo "===== SCM: $SCM ====="
 
-          echo "===== contenido de /home/site/wwwroot ====="
+          echo "===== wwwroot: todos los nombres ====="
           curl -s -u "$USUARIO:$CLAVE" "https://$SCM/api/vfs/site/wwwroot/" | python3 -c "
           import json, sys
-          try:
-              datos = json.load(sys.stdin)
-          except Exception:
-              print('(respuesta no interpretable)'); raise SystemExit
-          print('archivos:', len(datos))
-          for i in sorted(datos, key=lambda x: x['name'])[:40]:
-              print('  {:>12}  {}'.format(i.get('size', ''), i['name']))
+          datos = json.load(sys.stdin)
+          print(len(datos), 'entradas')
+          print(' '.join(sorted(d['name'] for d in datos)))
           " || echo "(no se pudo listar wwwroot)"
 
-          echo "===== /home/data/SitePackages (existe si corre desde paquete) ====="
-          curl -s -o /dev/null -w "  http=%{http_code}\n" -u "$USUARIO:$CLAVE" \
-            "https://$SCM/api/vfs/data/SitePackages/" || true
+          echo "===== variables de plataforma (solo claves no sensibles) ====="
+          curl -s -u "$USUARIO:$CLAVE" -H "Content-Type: application/json" \
+            -d '{"command":"printenv | grep -iE \"LINUX_FX_VERSION|RUN_FROM_PACKAGE|STARTUP|ASPNETCORE_ENVIRONMENT|WEBSITE_SITE_NAME|FRAMEWORK|WEBSITE_STACK\" | sort","dir":"/home"}' \
+            "https://$SCM/api/command" | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)
+          print(d.get('Output', '').strip() or '(sin salida)')
+          err = d.get('Error', '').strip()
+          if err:
+              print('stderr:', err)
+          " || echo "(no se pudo consultar el entorno)"
 
-          echo "===== log de arranque del contenedor ====="
+          echo "===== arranques de contenedor registrados ====="
+          curl -s -u "$USUARIO:$CLAVE" "https://$SCM/api/logs/docker" | python3 -c "
+          import json, sys
+          datos = json.load(sys.stdin)
+          datos.sort(key=lambda x: x.get('mtime', ''), reverse=True)
+          for d in datos[:8]:
+              print(' ', d.get('mtime'), d.get('size'), d.get('name'))
+          " || echo "(sin listado)"
+
+          echo "===== log más reciente ====="
           HREF=$(curl -s -u "$USUARIO:$CLAVE" "https://$SCM/api/logs/docker" | python3 -c "
           import json, sys
           try:
@@ -146,7 +159,7 @@ jobs:
           print(datos[0]['href'] if datos else '')
           ")
           if [ -n "$HREF" ]; then
-            curl -s -u "$USUARIO:$CLAVE" "$HREF" | sed "$CENSURA" | tail -80
+            curl -s -u "$USUARIO:$CLAVE" "$HREF" | sed "$CENSURA" | tail -60
           else
             echo "(sin logs de contenedor disponibles)"
           fi
