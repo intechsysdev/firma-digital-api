@@ -642,6 +642,13 @@
             color: var(--texto-suave);
         }
 
+        .final-nota {
+            margin: 14px 0 0;
+            font-size: 13px;
+            line-height: 1.5;
+            opacity: .75;
+        }
+
         .final-numero {
             display: inline-block;
             font-family: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
@@ -891,6 +898,17 @@
                 </svg>
                 Ver acta en PDF
             </button>
+            <button type="button" class="boton boton-secundario" id="btn-finalizar">
+                <svg class="icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M9 12l2 2 4-4" />
+                    <circle cx="12" cy="12" r="9" />
+                </svg>
+                <span id="txt-finalizar">Finalizar y liberar el equipo</span>
+            </button>
+            <p class="final-nota" id="final-nota">
+                Revisa el acta si quieres. Al finalizar, el formulario se cierra y el equipo queda listo para usarse.
+            </p>
         </div>
     </div>
 
@@ -1301,7 +1319,10 @@
                     ciudadFirma: CONFIG.ciudad,
                     firmaBase64: tablero.aPng(),
                     claveIdempotencia: claveIdempotencia,
-                    sincronizarMobiControl: true
+                    // Sin sincronizar todavía. Marcar el atributo en MobiControl cierra este
+                    // formulario, así que se deja para cuando el asociado pulse Finalizar y ya
+                    // haya podido ver el acta.
+                    sincronizarMobiControl: false
                 };
             }
 
@@ -1407,17 +1428,51 @@
                     $("final-titulo").textContent = "Acta ya registrada";
                     $("final-texto").textContent =
                         "Esta entrega ya estaba guardada en el servidor. No se creó un acta duplicada.";
-                } else if (respuesta.estadoProceso === "SINCRONIZADO") {
-                    $("final-texto").textContent = "La entrega quedó firmada y sincronizada con MobiControl.";
                 } else {
-                    $("final-texto").textContent =
-                        "Tu firma quedó guardada. La sincronización con MobiControl se completará más tarde; " +
-                        "no necesitas hacer nada.";
+                    $("final-texto").textContent = "Tu firma quedó guardada y el acta ya está generada.";
                 }
 
                 $("btn-ver-pdf").onclick = function () {
                     abrirPdf(respuesta.entregaUid);
                 };
+
+                $("btn-finalizar").onclick = function () {
+                    finalizar(respuesta.entregaUid);
+                };
+            }
+
+            /**
+             * Cierra la entrega: pide al API que marque el atributo de firma en MobiControl. Ese
+             * atributo es el que hace desaparecer el formulario y devuelve el equipo, por eso se
+             * llama aquí y no al registrar: si se marcara antes, el acta se cerraría de la vista
+             * antes de que el asociado alcanzara a abrirla.
+             */
+            function finalizar(entregaUid) {
+                var boton = $("btn-finalizar");
+                boton.disabled = true;
+                $("txt-finalizar").textContent = "Finalizando…";
+
+                fetch(url("/api/v1/entregas/" + entregaUid + "/finalizar"), {
+                    method: "POST",
+                    headers: { "X-Api-Key": apiKey() }
+                }).then(function (respuesta) {
+                    if (!respuesta.ok) throw new Error("No se pudo finalizar la entrega.");
+
+                    $("final-titulo").textContent = "Entrega finalizada";
+                    $("final-texto").textContent =
+                        "El equipo quedó liberado. Si el formulario no se cierra solo, ya puedes cerrarlo.";
+                    $("final-nota").hidden = true;
+                    boton.hidden = true;
+                }).catch(function () {
+                    // El acta ya está registrada: lo único pendiente es avisarle a MobiControl,
+                    // así que se deja reintentar en vez de dar el proceso por perdido.
+                    alert("No se pudo finalizar la entrega en este momento.
+
+El acta ya quedó guardada. " +
+                        "Vuelve a intentarlo en unos segundos.");
+                    boton.disabled = false;
+                    $("txt-finalizar").textContent = "Finalizar y liberar el equipo";
+                });
             }
 
             /**

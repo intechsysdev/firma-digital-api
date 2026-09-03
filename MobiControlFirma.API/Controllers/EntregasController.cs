@@ -96,4 +96,19 @@ public class EntregasController(IServicioEntregas entregas) : ControllerBase
     public async Task<ActionResult<IReadOnlyList<ResultadoSincronizacionDto>>> Reintentar(
         Guid entregaUid, CancellationToken ct) =>
         Ok(await entregas.ReintentarSincronizacionAsync(entregaUid, ct));
+
+    /// <summary>
+    /// Cierra la entrega desde el equipo: marca el atributo de firma en MobiControl, que es lo
+    /// que hace desaparecer el formulario y devuelve el dispositivo al asociado.
+    ///
+    /// Va separada del registro a propósito. Si el acta se sincronizara al guardarla, MobiControl
+    /// cerraría el formulario en ese mismo instante y el acta en PDF se perdería de vista antes
+    /// de que nadie alcance a abrirla. Registrar primero y cerrar después deja al asociado
+    /// revisar el documento y terminar cuando quiera.
+    /// </summary>
+    [HttpPost("{entregaUid:guid}/finalizar")]
+    [ApiKey(RolApi.Dispositivo)]
+    public async Task<ActionResult<IReadOnlyList<ResultadoSincronizacionDto>>> Finalizar(
+        Guid entregaUid, CancellationToken ct) =>
+        Ok(await entregas.ReintentarSincronizacionAsync(entregaUid, ct));
 }
