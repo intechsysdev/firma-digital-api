@@ -642,6 +642,14 @@
             color: var(--texto-suave);
         }
 
+        .final-caja .boton {
+            width: 100%;
+        }
+
+        .final-caja .boton + .boton {
+            margin-top: 10px;
+        }
+
         .final-nota {
             margin: 14px 0 0;
             font-size: 13px;
@@ -888,7 +896,7 @@
                 </svg>
             </div>
             <h2 id="final-titulo">Acta registrada</h2>
-            <p id="final-texto">La entrega quedó firmada y sincronizada con MobiControl.</p>
+            <p id="final-texto">Tu firma quedó guardada y el acta ya está generada.</p>
             <div class="final-numero" id="final-numero">—</div>
             <button type="button" class="boton boton-primario" id="btn-ver-pdf">
                 <svg class="icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -1466,10 +1474,8 @@
                 }).catch(function () {
                     // El acta ya está registrada: lo único pendiente es avisarle a MobiControl,
                     // así que se deja reintentar en vez de dar el proceso por perdido.
-                    alert("No se pudo finalizar la entrega en este momento.
-
-El acta ya quedó guardada. " +
-                        "Vuelve a intentarlo en unos segundos.");
+                    alert("No se pudo finalizar la entrega en este momento." + "\n" +
+                        "El acta ya quedó guardada. Vuelve a intentarlo en unos segundos.");
                     boton.disabled = false;
                     $("txt-finalizar").textContent = "Finalizar y liberar el equipo";
                 });
