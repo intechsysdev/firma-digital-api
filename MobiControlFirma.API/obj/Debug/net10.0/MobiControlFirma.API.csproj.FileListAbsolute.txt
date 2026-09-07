@@ -426,3 +426,5 @@ F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\obj\Debug
 F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\obj\Debug\net10.0\MobiCont.C41B805D.Up2Date
 F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\obj\Debug\net10.0\MobiControlFirma.API.genruntimeconfig.cache
 F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\obj\Debug\net10.0\ref\MobiControlFirma.API.dll
+F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\bin\Debug\net10.0\MobiControlFirma.API.staticwebassets.runtime.json
+F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\bin\Debug\net10.0\Microsoft.AspNetCore.Identity.EntityFrameworkCore.dll

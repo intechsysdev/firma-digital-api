@@ -23,6 +23,22 @@ jobs:
         with:
           dotnet-version: '10.x'
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: firma-digital-front/package-lock.json
+
+      # La consola de React se sirve desde el mismo App Service que el API: se compila aquí y
+      # se copia dentro del publicado. Así no hace falta un recurso aparte en Azure, y al
+      # compartir origen con el API tampoco hay CORS ni un token de despliegue más que guardar.
+      - name: Compilar la consola de React
+        working-directory: firma-digital-front
+        run: |
+          npm ci
+          npm run build
+
       - name: Build with dotnet
         run: dotnet build --configuration Release
 
@@ -32,6 +48,11 @@ jobs:
       # bienvenida corriendo y toda ruta responde 404 aunque el despliegue diga correcto.
       - name: dotnet publish
         run: dotnet publish MobiControlFirma.API/MobiControlFirma.API.csproj -c Release -o ${{env.DOTNET_ROOT}}/myapp
+
+      - name: Incrustar la consola en el publicado
+        run: |
+          mkdir -p ${{env.DOTNET_ROOT}}/myapp/wwwroot
+          cp -r firma-digital-front/dist/. ${{env.DOTNET_ROOT}}/myapp/wwwroot/
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4

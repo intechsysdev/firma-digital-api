@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "/mCbEAOof2g=",
+  "dgSpecHash": "1lM8qltZvOc=",
   "success": true,
   "projectFilePath": "F:\\Intechsys_Proj\\Firma_Digital\\firma-digital-api\\MobiControlFirma.Infrastructure\\MobiControlFirma.Infrastructure.csproj",
   "expectedPackageFiles": [
@@ -9,6 +9,7 @@
     "C:\\Users\\Jeffo-PC\\.nuget\\packages\\azure.storage.blobs\\12.29.2\\azure.storage.blobs.12.29.2.nupkg.sha512",
     "C:\\Users\\Jeffo-PC\\.nuget\\packages\\azure.storage.common\\12.28.0\\azure.storage.common.12.28.0.nupkg.sha512",
     "C:\\Users\\Jeffo-PC\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
+    "C:\\Users\\Jeffo-PC\\.nuget\\packages\\microsoft.aspnetcore.identity.entityframeworkcore\\10.0.11\\microsoft.aspnetcore.identity.entityframeworkcore.10.0.11.nupkg.sha512",
     "C:\\Users\\Jeffo-PC\\.nuget\\packages\\microsoft.bcl.asyncinterfaces\\10.0.3\\microsoft.bcl.asyncinterfaces.10.0.3.nupkg.sha512",
     "C:\\Users\\Jeffo-PC\\.nuget\\packages\\microsoft.build.framework\\18.0.2\\microsoft.build.framework.18.0.2.nupkg.sha512",
     "C:\\Users\\Jeffo-PC\\.nuget\\packages\\microsoft.codeanalysis.analyzers\\3.11.0\\microsoft.codeanalysis.analyzers.3.11.0.nupkg.sha512",

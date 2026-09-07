@@ -31,6 +31,13 @@ public class ApiKeyAttribute(RolApi rolMinimo = RolApi.Dispositivo) : Attribute,
 
     public void OnAuthorization(AuthorizationFilterContext context)
     {
+        // Un usuario con sesión iniciada en la consola ya se identificó con credenciales
+        // propias, que es una garantía mayor que una llave compartida: no se le pide además
+        // la cabecera. Las llaves siguen existiendo para el formulario del dispositivo, que
+        // corre sin nadie que pueda iniciar sesión.
+        if (context.HttpContext.User.Identity?.IsAuthenticated == true)
+            return;
+
         var opciones = context.HttpContext.RequestServices
             .GetRequiredService<IOptions<SeguridadOptions>>().Value;
 
@@ -57,6 +64,23 @@ public class ApiKeyAttribute(RolApi rolMinimo = RolApi.Dispositivo) : Attribute,
 
         if (!valida)
             context.Result = new UnauthorizedObjectResult(new { message = "La llave de acceso no es válida." });
+    }
+
+    /// <summary>
+    /// Si quien llama puede actuar como administrador: o entró con usuario y contraseña, o
+    /// presentó la llave de administrador. Lo usa el alta de usuarios, que vive fuera de los
+    /// controladores y por tanto fuera de este filtro.
+    /// </summary>
+    public static bool EsAdministrador(HttpContext contexto)
+    {
+        if (contexto.User.Identity?.IsAuthenticated == true) return true;
+
+        var opciones = contexto.RequestServices.GetRequiredService<IOptions<SeguridadOptions>>().Value;
+
+        var enviada = contexto.Request.Headers[NombreCabecera].FirstOrDefault()
+            ?? contexto.Request.Query["apiKey"].FirstOrDefault();
+
+        return !string.IsNullOrWhiteSpace(enviada) && SonIguales(opciones.ApiKeyAdministrador, enviada);
     }
 
     /// <summary>

@@ -213,3 +213,5 @@ F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\obj\Relea
 F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\obj\Release\net10.0\MobiControlFirma.API.genruntimeconfig.cache
 F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\obj\Release\net10.0\ref\MobiControlFirma.API.dll
 F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\bin\Release\net10.0\dotnet-tools.json
+F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\bin\Release\net10.0\Microsoft.AspNetCore.Identity.EntityFrameworkCore.dll
+F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.API\bin\Release\net10.0\MobiControlFirma.API.staticwebassets.runtime.json

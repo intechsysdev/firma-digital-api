@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using MobiControlFirma.Application.Common.Interfaces;
+using MobiControlFirma.Infrastructure.Identidad;
 using MobiControlFirma.Domain.Entities;
 using MobiControlFirma.Domain.Enums;
 
@@ -10,7 +12,7 @@ namespace MobiControlFirma.Infrastructure.Persistence;
 /// para que coincidan con el esquema entregado por el cliente (db/schema.sql).
 /// </summary>
 public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
-    : DbContext(options), IApplicationDbContext
+    : IdentityDbContext<UsuarioAdmin>(options), IApplicationDbContext
 {
     public DbSet<Distrito> Distritos => Set<Distrito>();
     public DbSet<Canal> Canales => Set<Canal>();

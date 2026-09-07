@@ -27,4 +27,14 @@ public class SeguridadOptions
 
     /// <summary>Llave para consultas administrativas y reintentos de sincronización.</summary>
     public string? ApiKeyAdministrador { get; set; }
+
+    /// <summary>
+    /// Correo del primer usuario de la consola. Se crea al arrancar solo si todavía no hay
+    /// ninguno: sin él nadie podría entrar a dar de alta al resto. Si se deja vacío no se
+    /// crea nada y el alta queda a cargo de la llave de administrador.
+    /// </summary>
+    public string? UsuarioInicial { get; set; }
+
+    /// <summary>Contraseña del usuario inicial. Conviene cambiarla en el primer ingreso.</summary>
+    public string? ClaveInicial { get; set; }
 }
