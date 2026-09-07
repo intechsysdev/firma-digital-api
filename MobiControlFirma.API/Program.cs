@@ -1,6 +1,7 @@
 using System.Text.Encodings.Web;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -16,7 +17,9 @@ using MobiControlFirma.Infrastructure.Persistence;
 var builder = WebApplication.CreateBuilder(args);
 
 const string PoliticaCors = "MobiControlFirmaCors";
-const string LimiteFirmas = "firmas";
+const string LimiteFirmas = PoliticasLimite.Firmas;
+const string LimiteGeneral = PoliticasLimite.General;
+const string LimiteCuenta = PoliticasLimite.Cuenta;
 
 // --- Opciones ---
 builder.Services.Configure<AppOptions>(builder.Configuration.GetSection(AppOptions.SectionName));
@@ -80,21 +83,71 @@ builder.Services.AddCors(options => options.AddPolicy(PoliticaCors, politica =>
     politica.AllowAnyHeader().AllowAnyMethod();
 }));
 
+// --- Cabeceras reenviadas ---
+// App Service entrega la petición desde su propio frente, así que sin esto
+// Connection.RemoteIpAddress devuelve la dirección del proxy y no la del cliente: el limitador
+// metería a todo el mundo en la misma partición y entre todos agotarían el cupo.
+builder.Services.Configure<ForwardedHeadersOptions>(opciones =>
+{
+    opciones.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+    // La dirección del frente de App Service no se conoce de antemano y cambia; con las listas
+    // por defecto el middleware descartaría la cabecera. La plataforma reescribe X-Forwarded-For
+    // en cada petición, de modo que lo que llega al proceso no es falsificable desde fuera.
+    opciones.KnownIPNetworks.Clear();
+    opciones.KnownProxies.Clear();
+});
+
 // --- Límite de peticiones ---
-// Registrar un acta cuesta un PDF y tres llamadas a MobiControl. Un equipo con el formulario
-// en bucle podría saturar el servidor sin querer, así que se acota por IP.
+// Tres cupos distintos porque el costo de cada ruta lo es. Registrar un acta cuesta un PDF y
+// tres llamadas a MobiControl; leer el histórico desde la consola no cuesta casi nada, y con un
+// único cupo estrecho la consola se autobloqueaba al abrir cualquier acta.
 builder.Services.AddRateLimiter(opciones =>
 {
     opciones.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Sin esto el 429 sale sin cuerpo y el formulario lo muestra como "el servidor respondió
+    // 429", que no le dice nada a quien está entregando un equipo.
+    opciones.OnRejected = async (contexto, ct) =>
+    {
+        contexto.HttpContext.Response.Headers.RetryAfter = "60";
+
+        if (!contexto.HttpContext.Response.HasStarted)
+        {
+            await contexto.HttpContext.Response.WriteAsJsonAsync(
+                new { message = "Demasiadas peticiones seguidas. Espera un minuto y vuelve a intentarlo." },
+                ct);
+        }
+    };
+
+    static string Cliente(HttpContext contexto) =>
+        contexto.Connection.RemoteIpAddress?.ToString() ?? "desconocida";
+
     opciones.AddPolicy(LimiteFirmas, contexto =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            contexto.Connection.RemoteIpAddress?.ToString() ?? "desconocida",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 20,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-            }));
+        RateLimitPartition.GetFixedWindowLimiter(Cliente(contexto), _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 20,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        }));
+
+    opciones.AddPolicy(LimiteGeneral, contexto =>
+        RateLimitPartition.GetFixedWindowLimiter(Cliente(contexto), _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 300,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        }));
+
+    // El ingreso se acota aparte: es la puerta que alguien intentaría forzar a ciegas. El
+    // bloqueo de Identity a los cinco intentos es la otra mitad de lo mismo.
+    opciones.AddPolicy(LimiteCuenta, contexto =>
+        RateLimitPartition.GetFixedWindowLimiter(Cliente(contexto), _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 40,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        }));
 });
 
 // --- Swagger ---
@@ -123,6 +176,10 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+
+// Lo primero de todo: el resto del canal necesita ver la IP real del cliente, no la del frente
+// de App Service.
+app.UseForwardedHeaders();
 
 // --- Migración + datos base ---
 using (var scope = app.Services.CreateScope())
@@ -211,9 +268,9 @@ app.Use(async (contexto, siguiente) =>
 
 app.UseRateLimiter();
 
-app.MapControllers().RequireRateLimiting(LimiteFirmas);
+app.MapControllers().RequireRateLimiting(LimiteGeneral);
 
-var cuenta = app.MapGroup("/api/v1/cuenta").WithTags("Cuenta").RequireRateLimiting(LimiteFirmas);
+var cuenta = app.MapGroup("/api/v1/cuenta").WithTags("Cuenta").RequireRateLimiting(LimiteCuenta);
 cuenta.MapIdentityApi<UsuarioAdmin>();
 
 // MapIdentityApi publica /register sin autenticación: tal cual, cualquiera en internet podría

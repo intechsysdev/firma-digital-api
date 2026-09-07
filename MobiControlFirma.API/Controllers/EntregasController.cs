@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using MobiControlFirma.API.Configuration;
 using MobiControlFirma.Application.Entregas;
 
@@ -14,6 +15,9 @@ public class EntregasController(IServicioEntregas entregas) : ControllerBase
     /// </summary>
     [HttpPost]
     [ApiKey(RolApi.Dispositivo)]
+    // El único endpoint caro del API, y el que el limitador existía para proteger: se suma al
+    // cupo general en vez de reemplazarlo.
+    [EnableRateLimiting(PoliticasLimite.Firmas)]
     [ProducesResponseType(typeof(EntregaCreadaResponse), StatusCodes.Status201Created)]
     public async Task<ActionResult<EntregaCreadaResponse>> Registrar(
         RegistrarEntregaRequest solicitud, CancellationToken ct)
