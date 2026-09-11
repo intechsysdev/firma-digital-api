@@ -230,6 +230,33 @@ using (var scope = app.Services.CreateScope())
 
     await ApplicationDbContextSeed.SeedAsync(db);
 
+    // Sin un superadministrador nadie puede crear empresas ni usuarios, y el sistema queda
+    // cerrado sobre sí mismo sin forma de abrirlo salvo tocando la base a mano. Pasa, por
+    // ejemplo, cuando los usuarios existían desde antes de que hubiera roles. La regla es
+    // simple: si no hay ninguno, el usuario más antiguo asume el papel.
+    {
+        var gestorUsuarios = scope.ServiceProvider.GetRequiredService<UserManager<UsuarioAdmin>>();
+        var bitacora = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+        var hayAlguno = (await gestorUsuarios.GetUsersInRoleAsync(Roles.SuperAdministrador)).Count > 0;
+
+        if (!hayAlguno && gestorUsuarios.Users.Any())
+        {
+            var masAntiguo = gestorUsuarios.Users
+                .OrderBy(u => u.FechaCreacion)
+                .ThenBy(u => u.Email)
+                .First();
+
+            masAntiguo.Activo = true;
+            masAntiguo.EmpresaId = null;
+            await gestorUsuarios.UpdateAsync(masAntiguo);
+            await gestorUsuarios.AddToRoleAsync(masAntiguo, Roles.SuperAdministrador);
+
+            bitacora.LogWarning(
+                "No había superadministrador: {Correo} asumió el rol.", masAntiguo.Email);
+        }
+    }
+
     // Usuario inicial de la consola. Solo cuando la tabla está vacía: si ya hay usuarios, este
     // bloque no toca nada, así que cambiar la contraseña en la consola no la revierte el
     // siguiente despliegue.
@@ -237,6 +264,7 @@ using (var scope = app.Services.CreateScope())
         !string.IsNullOrWhiteSpace(seguridad.ClaveInicial))
     {
         var usuarios = scope.ServiceProvider.GetRequiredService<UserManager<UsuarioAdmin>>();
+        var registroArranque = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
         if (!usuarios.Users.Any())
         {
@@ -253,7 +281,7 @@ using (var scope = app.Services.CreateScope())
             var creado = await usuarios.CreateAsync(inicial, seguridad.ClaveInicial);
             if (creado.Succeeded)
                 await usuarios.AddToRoleAsync(inicial, Roles.SuperAdministrador);
-            var registro = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            var registro = registroArranque;
 
             if (creado.Succeeded)
                 registro.LogInformation("Usuario inicial {Correo} creado.", seguridad.UsuarioInicial);
