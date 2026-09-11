@@ -168,6 +168,9 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(true);
 
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Nombre")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -175,7 +178,9 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
 
                     b.HasKey("CanalId");
 
-                    b.HasIndex("Nombre")
+                    b.HasIndex("EmpresaId");
+
+                    b.HasIndex("EmpresaId", "Nombre")
                         .IsUnique();
 
                     b.ToTable("Canales", (string)null);
@@ -197,6 +202,9 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
                     b.Property<decimal?>("CostoEquipo")
                         .HasPrecision(12, 2)
                         .HasColumnType("decimal(12,2)");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("int");
 
                     b.Property<int?>("EstadoActualId")
                         .HasColumnType("int");
@@ -232,13 +240,15 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
 
                     b.HasKey("DispositivoId");
 
+                    b.HasIndex("EmpresaId");
+
                     b.HasIndex("EstadoActualId");
 
-                    b.HasIndex("IMEI")
+                    b.HasIndex("EmpresaId", "IMEI")
                         .IsUnique()
                         .HasFilter("[IMEI] IS NOT NULL");
 
-                    b.HasIndex("MobiControlDeviceId")
+                    b.HasIndex("EmpresaId", "MobiControlDeviceId")
                         .IsUnique();
 
                     b.ToTable("Dispositivos", (string)null);
@@ -257,6 +267,9 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(true);
 
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Nombre")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -264,7 +277,9 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
 
                     b.HasKey("DistritoId");
 
-                    b.HasIndex("Nombre")
+                    b.HasIndex("EmpresaId");
+
+                    b.HasIndex("EmpresaId", "Nombre")
                         .IsUnique();
 
                     b.ToTable("Distritos", (string)null);
@@ -277,6 +292,9 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("DocumentoId"));
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("int");
 
                     b.Property<int>("EntregaId")
                         .HasColumnType("int");
@@ -313,6 +331,8 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
 
                     b.HasKey("DocumentoId");
 
+                    b.HasIndex("EmpresaId");
+
                     b.HasIndex("EntregaId")
                         .IsUnique();
 
@@ -342,6 +362,9 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
                     b.Property<int?>("DistritoId")
                         .HasColumnType("int");
 
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("FechaActualizacion")
                         .HasColumnType("datetime2");
 
@@ -359,12 +382,108 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CanalId");
 
-                    b.HasIndex("Cedula")
-                        .IsUnique();
-
                     b.HasIndex("DistritoId");
 
+                    b.HasIndex("EmpresaId");
+
+                    b.HasIndex("EmpresaId", "Cedula")
+                        .IsUnique();
+
                     b.ToTable("Empleados", (string)null);
+                });
+
+            modelBuilder.Entity("MobiControlFirma.Domain.Entities.Empresa", b =>
+                {
+                    b.Property<int>("EmpresaId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EmpresaId"));
+
+                    b.Property<bool>("Activo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<byte[]>("ApiKeyHash")
+                        .IsRequired()
+                        .HasColumnType("varbinary(32)");
+
+                    b.Property<string>("ApiKeyPrefijo")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("nvarchar(12)");
+
+                    b.Property<DateTime?>("ApiKeyRotadaEn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CiudadFirma")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasDefaultValue("Cali");
+
+                    b.Property<DateTime?>("FechaActualizacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<string>("MobiControlAtributoFecha")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("MobiControlAtributoFirma")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("MobiControlBaseUrl")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("MobiControlClientId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("MobiControlClientSecret")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("MobiControlPassword")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("MobiControlTimeoutSegundos")
+                        .HasColumnType("int");
+
+                    b.Property<string>("MobiControlUsuario")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Nit")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.HasKey("EmpresaId");
+
+                    b.HasIndex("ApiKeyHash")
+                        .IsUnique()
+                        .HasDatabaseName("UQ_Empresas_ApiKeyHash");
+
+                    b.HasIndex("Nombre")
+                        .IsUnique();
+
+                    b.ToTable("Empresas", (string)null);
                 });
 
             modelBuilder.Entity("MobiControlFirma.Domain.Entities.EntregaDispositivo", b =>
@@ -398,6 +517,9 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
                         .HasColumnType("int");
 
                     b.Property<int>("EmpleadoId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EmpresaId")
                         .HasColumnType("int");
 
                     b.Property<Guid>("EntregaUid")
@@ -452,11 +574,6 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CanalId");
 
-                    b.HasIndex("ClaveIdempotencia")
-                        .IsUnique()
-                        .HasDatabaseName("UQ_EntregasDispositivo_Idempotencia")
-                        .HasFilter("[ClaveIdempotencia] IS NOT NULL");
-
                     b.HasIndex("DispositivoId")
                         .HasDatabaseName("IX_EntregasDispositivo_Dispositivo");
 
@@ -464,6 +581,8 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("EmpleadoId")
                         .HasDatabaseName("IX_EntregasDispositivo_Empleado");
+
+                    b.HasIndex("EmpresaId");
 
                     b.HasIndex("EntregaUid")
                         .IsUnique();
@@ -475,6 +594,11 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("FechaFirma")
                         .HasDatabaseName("IX_EntregasDispositivo_Fecha");
+
+                    b.HasIndex("EmpresaId", "ClaveIdempotencia")
+                        .IsUnique()
+                        .HasDatabaseName("UQ_EntregasDispositivo_Idempotencia")
+                        .HasFilter("[ClaveIdempotencia] IS NOT NULL");
 
                     b.ToTable("EntregasDispositivo", null, t =>
                         {
@@ -490,6 +614,9 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EstadoId"));
 
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Nombre")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -497,7 +624,9 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
 
                     b.HasKey("EstadoId");
 
-                    b.HasIndex("Nombre")
+                    b.HasIndex("EmpresaId");
+
+                    b.HasIndex("EmpresaId", "Nombre")
                         .IsUnique();
 
                     b.ToTable("EstadosDispositivo", (string)null);
@@ -510,6 +639,9 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("FirmaId"));
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("int");
 
                     b.Property<int>("EntregaId")
                         .HasColumnType("int");
@@ -546,6 +678,8 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
 
                     b.HasKey("FirmaId");
 
+                    b.HasIndex("EmpresaId");
+
                     b.HasIndex("EntregaId")
                         .IsUnique();
 
@@ -573,6 +707,9 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
 
                     b.Property<byte[]>("ClientSecretCifrado")
                         .HasColumnType("varbinary(max)");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("int");
 
                     b.Property<string>("Entorno")
                         .IsRequired()
@@ -611,7 +748,9 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
 
                     b.HasKey("ConfiguracionId");
 
-                    b.HasIndex("Proveedor", "Entorno")
+                    b.HasIndex("EmpresaId");
+
+                    b.HasIndex("EmpresaId", "Proveedor", "Entorno")
                         .IsUnique()
                         .HasDatabaseName("UQ_IntegracionesConfig_Proveedor_Entorno");
 
@@ -634,6 +773,9 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SincronizacionId"));
 
                     b.Property<int?>("CodigoRespuestaHttp")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EmpresaId")
                         .HasColumnType("int");
 
                     b.Property<int>("EntregaId")
@@ -660,6 +802,8 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
 
                     b.HasKey("SincronizacionId");
 
+                    b.HasIndex("EmpresaId");
+
                     b.HasIndex("EntregaId")
                         .HasDatabaseName("IX_IntegracionesSync_Entrega");
 
@@ -680,6 +824,9 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("int");
 
+                    b.Property<bool>("Activo")
+                        .HasColumnType("bit");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("nvarchar(max)");
@@ -690,6 +837,12 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
 
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("bit");
+
+                    b.Property<int?>("EmpresaId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2");
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("bit");
@@ -791,23 +944,61 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("MobiControlFirma.Domain.Entities.Canal", b =>
+                {
+                    b.HasOne("MobiControlFirma.Domain.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Empresa");
+                });
+
             modelBuilder.Entity("MobiControlFirma.Domain.Entities.Dispositivo", b =>
                 {
+                    b.HasOne("MobiControlFirma.Domain.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("MobiControlFirma.Domain.Entities.EstadoDispositivo", "EstadoActual")
                         .WithMany()
                         .HasForeignKey("EstadoActualId")
                         .OnDelete(DeleteBehavior.NoAction);
 
+                    b.Navigation("Empresa");
+
                     b.Navigation("EstadoActual");
+                });
+
+            modelBuilder.Entity("MobiControlFirma.Domain.Entities.Distrito", b =>
+                {
+                    b.HasOne("MobiControlFirma.Domain.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Empresa");
                 });
 
             modelBuilder.Entity("MobiControlFirma.Domain.Entities.DocumentoPdf", b =>
                 {
+                    b.HasOne("MobiControlFirma.Domain.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("MobiControlFirma.Domain.Entities.EntregaDispositivo", "Entrega")
                         .WithOne("DocumentoPdf")
                         .HasForeignKey("MobiControlFirma.Domain.Entities.DocumentoPdf", "EntregaId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Empresa");
 
                     b.Navigation("Entrega");
                 });
@@ -824,9 +1015,17 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
                         .HasForeignKey("DistritoId")
                         .OnDelete(DeleteBehavior.NoAction);
 
+                    b.HasOne("MobiControlFirma.Domain.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Canal");
 
                     b.Navigation("Distrito");
+
+                    b.Navigation("Empresa");
                 });
 
             modelBuilder.Entity("MobiControlFirma.Domain.Entities.EntregaDispositivo", b =>
@@ -853,6 +1052,12 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
+                    b.HasOne("MobiControlFirma.Domain.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("MobiControlFirma.Domain.Entities.EstadoDispositivo", "Estado")
                         .WithMany()
                         .HasForeignKey("EstadoId")
@@ -866,27 +1071,67 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
 
                     b.Navigation("Empleado");
 
+                    b.Navigation("Empresa");
+
                     b.Navigation("Estado");
+                });
+
+            modelBuilder.Entity("MobiControlFirma.Domain.Entities.EstadoDispositivo", b =>
+                {
+                    b.HasOne("MobiControlFirma.Domain.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Empresa");
                 });
 
             modelBuilder.Entity("MobiControlFirma.Domain.Entities.Firma", b =>
                 {
+                    b.HasOne("MobiControlFirma.Domain.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("MobiControlFirma.Domain.Entities.EntregaDispositivo", "Entrega")
                         .WithOne("Firma")
                         .HasForeignKey("MobiControlFirma.Domain.Entities.Firma", "EntregaId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("Empresa");
+
                     b.Navigation("Entrega");
+                });
+
+            modelBuilder.Entity("MobiControlFirma.Domain.Entities.IntegracionConfiguracion", b =>
+                {
+                    b.HasOne("MobiControlFirma.Domain.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Empresa");
                 });
 
             modelBuilder.Entity("MobiControlFirma.Domain.Entities.IntegracionSincronizacion", b =>
                 {
+                    b.HasOne("MobiControlFirma.Domain.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("MobiControlFirma.Domain.Entities.EntregaDispositivo", "Entrega")
                         .WithMany("Sincronizaciones")
                         .HasForeignKey("EntregaId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Empresa");
 
                     b.Navigation("Entrega");
                 });

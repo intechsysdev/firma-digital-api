@@ -4,9 +4,13 @@ namespace MobiControlFirma.Domain.Entities;
 /// Persona que recibe el equipo (EL TENEDOR en el acta). Se identifica por cédula porque es
 /// el único dato que MobiControl envía de forma estable en <c>%CustomAttr:Cedula%</c>.
 /// </summary>
-public class Empleado
+public class Empleado : IDeEmpresa
 {
     public int EmpleadoId { get; set; }
+
+    /// <summary>Empresa dueña del registro. El contexto filtra por aquí en cada consulta.</summary>
+    public int EmpresaId { get; set; }
+    public Empresa Empresa { get; set; } = null!;
     public string Cedula { get; set; } = string.Empty;
     public string NombreCompleto { get; set; } = string.Empty;
 

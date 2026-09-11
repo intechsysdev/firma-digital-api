@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using MobiControlFirma.API.Configuration;
 using MobiControlFirma.Application.Common;
+using MobiControlFirma.Application.Common.Interfaces;
 using MobiControlFirma.Infrastructure;
 using MobiControlFirma.Infrastructure.Identidad;
 using MobiControlFirma.Infrastructure.MobiControl;
@@ -55,6 +56,12 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // Los endpoints traen su propio esquema de token bearer, así que el front no maneja cookies
 // y puede vivir en cualquier origen sin depender de CSRF.
 builder.Services.AddAuthorization();
+
+// El contexto de empresa se resuelve por petición y lo consulta el contexto de datos para
+// filtrar: sin el accessor no habría de dónde sacarlo.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IContextoEmpresa, ContextoEmpresa>();
+
 builder.Services
     .AddIdentityApiEndpoints<UsuarioAdmin>(opciones =>
     {
@@ -65,7 +72,12 @@ builder.Services
         opciones.Lockout.MaxFailedAccessAttempts = 5;
         opciones.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
     })
-    .AddEntityFrameworkStores<ApplicationDbContext>();
+    .AddRoles<IdentityRole>()
+    .AddEntityFrameworkStores<ApplicationDbContext>()
+    // Mete la empresa del usuario en su token, que es de donde la lee el filtro de datos.
+    .AddClaimsPrincipalFactory<FabricaClaimsUsuario>()
+    // Rechaza el ingreso de usuarios o empresas desactivados, que Identity no mira.
+    .AddSignInManager<GestorIngreso>();
 
 // --- CORS ---
 // El formulario se instala en el equipo y el navegador lo abre desde el sistema de archivos,
@@ -187,8 +199,36 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     await db.Database.MigrateAsync();
 
+    // Roles de la consola. Se crean si faltan y no se tocan si ya están.
+    var roles = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    foreach (var rol in Roles.Todos)
+    {
+        if (!await roles.RoleExistsAsync(rol))
+            await roles.CreateAsync(new IdentityRole(rol));
+    }
+
+    // La configuración de MobiControl vivía en appsettings, una sola para todo el API. Ahora es
+    // de cada empresa: se traspasa a la primera —la que heredó los datos existentes— y solo si
+    // todavía no tiene la suya, para no pisar lo que se edite después desde la consola.
     var mobiControl = scope.ServiceProvider.GetRequiredService<IOptions<MobiControlOptions>>().Value;
-    await ApplicationDbContextSeed.SeedAsync(db, mobiControl.BaseUrl);
+    var primeraEmpresa = await db.Empresas.OrderBy(e => e.EmpresaId).FirstOrDefaultAsync();
+
+    if (primeraEmpresa is { MobiControlConfigurado: false } && mobiControl.EstaConfigurado)
+    {
+        primeraEmpresa.MobiControlBaseUrl = mobiControl.BaseUrl;
+        primeraEmpresa.MobiControlClientId = mobiControl.ClientId;
+        primeraEmpresa.MobiControlClientSecret = mobiControl.ClientSecret;
+        primeraEmpresa.MobiControlUsuario = mobiControl.Usuario;
+        primeraEmpresa.MobiControlPassword = mobiControl.Password;
+        primeraEmpresa.MobiControlAtributoFirma = mobiControl.AtributoFirma;
+        primeraEmpresa.MobiControlAtributoFecha = mobiControl.AtributoFecha;
+        primeraEmpresa.MobiControlTimeoutSegundos = mobiControl.TimeoutSegundos;
+        primeraEmpresa.FechaActualizacion = DateTime.UtcNow;
+
+        await db.SaveChangesAsync();
+    }
+
+    await ApplicationDbContextSeed.SeedAsync(db);
 
     // Usuario inicial de la consola. Solo cuando la tabla está vacía: si ya hay usuarios, este
     // bloque no toca nada, así que cambiar la contraseña en la consola no la revierte el
@@ -205,10 +245,14 @@ using (var scope = app.Services.CreateScope())
                 UserName = seguridad.UsuarioInicial,
                 Email = seguridad.UsuarioInicial,
                 EmailConfirmed = true,
-                NombreCompleto = "Administrador",
+                NombreCompleto = "Superadministrador",
+                // Sin empresa a propósito: es quien las da de alta y las ve todas.
+                EmpresaId = null,
             };
 
             var creado = await usuarios.CreateAsync(inicial, seguridad.ClaveInicial);
+            if (creado.Succeeded)
+                await usuarios.AddToRoleAsync(inicial, Roles.SuperAdministrador);
             var registro = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
             if (creado.Succeeded)

@@ -3,6 +3,8 @@ using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.Options;
+using MobiControlFirma.Infrastructure.Identidad;
+using MobiControlFirma.Infrastructure.Persistence;
 
 namespace MobiControlFirma.API.Configuration;
 
@@ -55,15 +57,39 @@ public class ApiKeyAttribute(RolApi rolMinimo = RolApi.Dispositivo) : Attribute,
             return;
         }
 
-        // La llave de administrador sirve para todo; la del dispositivo solo para lo suyo.
-        var aceptadas = rolMinimo == RolApi.Administrador
-            ? new[] { opciones.ApiKeyAdministrador }
-            : [opciones.ApiKeyAdministrador, opciones.ApiKeyDispositivo];
+        // La llave de administrador es la del sistema entero, no la de una empresa: equivale a
+        // un superadministrador y por eso no fija ninguna empresa en la petición.
+        if (SonIguales(opciones.ApiKeyAdministrador, enviada!))
+        {
+            context.HttpContext.Items[ContextoEmpresa.ClaveSuperAdmin] = true;
+            return;
+        }
 
-        var valida = aceptadas.Any(esperada => SonIguales(esperada, enviada!));
+        if (rolMinimo == RolApi.Administrador)
+        {
+            context.Result = new UnauthorizedObjectResult(
+                new { message = "Esta operación requiere una sesión de administrador." });
+            return;
+        }
 
-        if (!valida)
+        // Llave de equipo: identifica a la empresa además de autenticar. Se busca por el
+        // resumen, nunca por la llave, que no está guardada en ninguna parte.
+        var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+        var resumen = LlavesDispositivo.Resumir(enviada!);
+
+        var empresaId = db.Empresas
+            .Where(e => e.Activo && e.ApiKeyHash == resumen)
+            .Select(e => (int?)e.EmpresaId)
+            .FirstOrDefault();
+
+        if (empresaId is null)
+        {
             context.Result = new UnauthorizedObjectResult(new { message = "La llave de acceso no es válida." });
+            return;
+        }
+
+        // A partir de aquí toda consulta de esta petición queda acotada a esa empresa.
+        context.HttpContext.Items[ContextoEmpresa.ClaveEnContexto] = empresaId.Value;
     }
 
     /// <summary>

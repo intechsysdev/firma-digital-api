@@ -23,7 +23,7 @@ public class SaludController(ApplicationDbContext db, IClienteMobiControl mobiCo
         {
             estado = baseDatos ? "ok" : "degradado",
             baseDatos,
-            mobiControlConfigurado = mobiControl.EstaConfigurado,
+            mobiControlConfigurado = await mobiControl.EstaConfiguradoAsync(ct),
             utc = DateTime.UtcNow,
         });
     }

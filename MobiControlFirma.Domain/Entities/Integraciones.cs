@@ -6,9 +6,13 @@ namespace MobiControlFirma.Domain.Entities;
 /// Bitácora de cada llamada a un sistema externo. Es lo que permite responder "¿por qué este
 /// equipo sigue sin la marca de firma en MobiControl?" sin tener que leer logs del servidor.
 /// </summary>
-public class IntegracionSincronizacion
+public class IntegracionSincronizacion : IDeEmpresa
 {
     public int SincronizacionId { get; set; }
+
+    /// <summary>Empresa dueña del registro. El contexto filtra por aquí en cada consulta.</summary>
+    public int EmpresaId { get; set; }
+    public Empresa Empresa { get; set; } = null!;
 
     public int EntregaId { get; set; }
     public EntregaDispositivo Entrega { get; set; } = null!;
@@ -29,9 +33,13 @@ public class IntegracionSincronizacion
 /// no se guardan: el API las lee de la configuración de la aplicación y usa esta tabla solo
 /// para saber a qué URL apuntar y qué proveedores están habilitados.
 /// </summary>
-public class IntegracionConfiguracion
+public class IntegracionConfiguracion : IDeEmpresa
 {
     public int ConfiguracionId { get; set; }
+
+    /// <summary>Empresa dueña del registro. El contexto filtra por aquí en cada consulta.</summary>
+    public int EmpresaId { get; set; }
+    public Empresa Empresa { get; set; } = null!;
     public ProveedorIntegracion Proveedor { get; set; }
     public string Entorno { get; set; } = "PRODUCCION";
     public TipoAutenticacion TipoAutenticacion { get; set; }

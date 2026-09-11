@@ -47,21 +47,12 @@ public static class DependencyInjection
 
         // ---- MobiControl ----
         services.Configure<MobiControlOptions>(configuration.GetSection(MobiControlOptions.SectionName));
-        services.AddHttpClient<IClienteMobiControl, ClienteMobiControl>((sp, cliente) =>
+        // Sin BaseAddress: cada empresa apunta a su propia consola, así que el cliente compone
+        // la URL completa en cada llamada. El plazo real lo pone cada empresa con su propio
+        // CancellationToken; este es solo un tope duro para que nada quede colgado para siempre.
+        services.AddHttpClient<IClienteMobiControl, ClienteMobiControl>(cliente =>
         {
-            var opciones = sp.GetRequiredService<IOptions<MobiControlOptions>>().Value;
-
-            if (!string.IsNullOrWhiteSpace(opciones.BaseUrl))
-            {
-                // La barra final es obligatoria: sin ella, BaseAddress descarta el último
-                // segmento de la ruta y las peticiones salen a /api/token en la raíz del host.
-                var baseUrl = opciones.BaseUrl.TrimEnd('/') + "/";
-                cliente.BaseAddress = new Uri(baseUrl);
-            }
-
-            // El asociado está esperando con el equipo en la mano: si la consola no responde,
-            // vale más cerrar el acta y reintentar la sincronización después que dejarlo colgado.
-            cliente.Timeout = TimeSpan.FromSeconds(Math.Max(5, opciones.TimeoutSegundos));
+            cliente.Timeout = TimeSpan.FromMinutes(2);
         });
 
         // ---- Caso de uso principal ----

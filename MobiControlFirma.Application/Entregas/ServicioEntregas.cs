@@ -13,6 +13,7 @@ namespace MobiControlFirma.Application.Entregas;
 /// </summary>
 public class ServicioEntregas(
     IApplicationDbContext db,
+    IContextoEmpresa empresa,
     IAlmacenamientoArchivos almacenamiento,
     IGeneradorActaPdf generadorPdf,
     IClienteMobiControl mobiControl,
@@ -72,6 +73,7 @@ public class ServicioEntregas(
 
         var entrega = new EntregaDispositivo
         {
+            EmpresaId = empresa.EmpresaRequerida,
             EntregaUid = Guid.NewGuid(),
             DispositivoId = dispositivo.DispositivoId,
             EmpleadoId = empleado.EmpleadoId,
@@ -118,9 +120,10 @@ public class ServicioEntregas(
 
         var actaPdf = generadorPdf.Generar(datosActa, firmaPng);
 
-        // La ruta se arma con el año y el mes para que el contenedor no termine con cientos de
-        // miles de archivos planos, y con el UID para que nunca se pisen dos actas.
-        var carpeta = $"{entrega.FechaFirma:yyyy/MM}";
+        // La ruta se arma con la empresa primero, y luego año y mes: así el contenedor no
+        // termina con cientos de miles de archivos planos, las actas de dos empresas nunca
+        // comparten carpeta, y el UID garantiza que no se pisen entre ellas.
+        var carpeta = $"empresa-{entrega.EmpresaId}/{entrega.FechaFirma:yyyy/MM}";
         var firmaGuardada = await almacenamiento.GuardarAsync(
             ContenedorFirmas, $"{carpeta}/{entrega.EntregaUid}.png", firmaPng, "image/png", ct);
         var pdfGuardado = await almacenamiento.GuardarAsync(
@@ -128,6 +131,7 @@ public class ServicioEntregas(
 
         entrega.Firma = new Firma
         {
+            EmpresaId = empresa.EmpresaRequerida,
             NombreContenedor = firmaGuardada.Contenedor,
             RutaBlob = firmaGuardada.Ruta,
             UrlBlob = firmaGuardada.Url,
@@ -139,6 +143,7 @@ public class ServicioEntregas(
 
         entrega.DocumentoPdf = new DocumentoPdf
         {
+            EmpresaId = empresa.EmpresaRequerida,
             NombreContenedor = pdfGuardado.Contenedor,
             RutaBlob = pdfGuardado.Ruta,
             UrlBlob = pdfGuardado.Url,
@@ -322,6 +327,7 @@ public class ServicioEntregas(
         {
             empleado = new Empleado
             {
+                EmpresaId = empresa.EmpresaRequerida,
                 Cedula = cedula,
                 NombreCompleto = nombreCompleto,
                 FechaCreacion = ahora,
@@ -344,6 +350,7 @@ public class ServicioEntregas(
         {
             dispositivo = new Dispositivo
             {
+                EmpresaId = empresa.EmpresaRequerida,
                 MobiControlDeviceId = deviceId,
                 FechaCreacion = ahora,
             };
@@ -376,7 +383,7 @@ public class ServicioEntregas(
         var canal = await db.Canales.FirstOrDefaultAsync(c => c.Nombre == nombre, ct);
         if (canal is not null) return canal;
 
-        canal = new Canal { Nombre = nombre };
+        canal = new Canal { EmpresaId = empresa.EmpresaRequerida, Nombre = nombre };
         db.Canales.Add(canal);
         return canal;
     }
@@ -388,7 +395,7 @@ public class ServicioEntregas(
         var distrito = await db.Distritos.FirstOrDefaultAsync(d => d.Nombre == nombre, ct);
         if (distrito is not null) return distrito;
 
-        distrito = new Distrito { Nombre = nombre };
+        distrito = new Distrito { EmpresaId = empresa.EmpresaRequerida, Nombre = nombre };
         db.Distritos.Add(distrito);
         return distrito;
     }
@@ -400,7 +407,7 @@ public class ServicioEntregas(
         var estado = await db.EstadosDispositivo.FirstOrDefaultAsync(e => e.Nombre == nombre, ct);
         if (estado is not null) return estado;
 
-        estado = new EstadoDispositivo { Nombre = nombre };
+        estado = new EstadoDispositivo { EmpresaId = empresa.EmpresaRequerida, Nombre = nombre };
         db.EstadosDispositivo.Add(estado);
         return estado;
     }
@@ -451,6 +458,7 @@ public class ServicioEntregas(
         {
             db.Sincronizaciones.Add(new IntegracionSincronizacion
             {
+                EmpresaId = entrega.EmpresaId,
                 EntregaId = entrega.EntregaId,
                 Proveedor = ProveedorIntegracion.MOBICONTROL,
                 TipoAccion = resultado.Accion,

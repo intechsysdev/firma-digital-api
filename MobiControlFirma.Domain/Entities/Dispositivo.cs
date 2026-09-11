@@ -5,9 +5,13 @@ namespace MobiControlFirma.Domain.Entities;
 /// (el <c>%deviceid%</c> del formulario): el IMEI puede venir vacío en equipos que aún no
 /// reportan y no sirve como llave.
 /// </summary>
-public class Dispositivo
+public class Dispositivo : IDeEmpresa
 {
     public int DispositivoId { get; set; }
+
+    /// <summary>Empresa dueña del registro. El contexto filtra por aquí en cada consulta.</summary>
+    public int EmpresaId { get; set; }
+    public Empresa Empresa { get; set; } = null!;
     public string MobiControlDeviceId { get; set; } = string.Empty;
 
     public string? Fabricante { get; set; }

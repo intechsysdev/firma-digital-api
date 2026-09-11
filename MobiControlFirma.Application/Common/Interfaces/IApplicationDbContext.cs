@@ -6,6 +6,7 @@ namespace MobiControlFirma.Application.Common.Interfaces;
 /// <summary>Abstracción del contexto de datos usada por la capa de aplicación.</summary>
 public interface IApplicationDbContext
 {
+    DbSet<Empresa> Empresas { get; }
     DbSet<Distrito> Distritos { get; }
     DbSet<Canal> Canales { get; }
     DbSet<EstadoDispositivo> EstadosDispositivo { get; }

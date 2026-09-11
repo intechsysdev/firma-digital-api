@@ -6,9 +6,13 @@ namespace MobiControlFirma.Domain.Entities;
 /// Acta de entrega firmada. Es un histórico: cada firma agrega una fila y ninguna se
 /// sobrescribe, porque el documento tiene valor probatorio frente a un descuento de nómina.
 /// </summary>
-public class EntregaDispositivo
+public class EntregaDispositivo : IDeEmpresa
 {
     public int EntregaId { get; set; }
+
+    /// <summary>Empresa dueña del registro. El contexto filtra por aquí en cada consulta.</summary>
+    public int EmpresaId { get; set; }
+    public Empresa Empresa { get; set; } = null!;
 
     /// <summary>Identificador público. Es el que viaja en las URLs del PDF y de la firma.</summary>
     public Guid EntregaUid { get; set; } = Guid.NewGuid();

@@ -33,8 +33,12 @@ public record ResultadoIntegracion(string Accion, bool Exitoso, int? CodigoHttp,
 /// <summary>Cliente de la API de MobiControl (token, atributos personalizados y check-in).</summary>
 public interface IClienteMobiControl
 {
-    /// <summary>False cuando faltan credenciales: el API sigue firmando, solo no sincroniza.</summary>
-    bool EstaConfigurado { get; }
+    /// <summary>
+    /// False cuando la empresa de la petición no tiene consola configurada: el API sigue
+    /// firmando actas, solo que quedan sin sincronizar. Es asíncrono porque la configuración
+    /// vive en la base, una por empresa, y no en un archivo del servidor.
+    /// </summary>
+    Task<bool> EstaConfiguradoAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Marca el equipo como firmado y le pide un check-in inmediato. Devuelve una entrada de

@@ -5,9 +5,13 @@ namespace MobiControlFirma.Domain.Entities;
 /// (Azure Blob en producción, disco local en desarrollo); aquí solo queda la ruta y el
 /// hash para poder demostrar que el archivo no se alteró después.
 /// </summary>
-public class Firma
+public class Firma : IDeEmpresa
 {
     public int FirmaId { get; set; }
+
+    /// <summary>Empresa dueña del registro. El contexto filtra por aquí en cada consulta.</summary>
+    public int EmpresaId { get; set; }
+    public Empresa Empresa { get; set; } = null!;
     public int EntregaId { get; set; }
     public EntregaDispositivo Entrega { get; set; } = null!;
 
@@ -21,9 +25,13 @@ public class Firma
 }
 
 /// <summary>Referencia al acta en PDF generada por el API (misma lógica que <see cref="Firma"/>).</summary>
-public class DocumentoPdf
+public class DocumentoPdf : IDeEmpresa
 {
     public int DocumentoId { get; set; }
+
+    /// <summary>Empresa dueña del registro. El contexto filtra por aquí en cada consulta.</summary>
+    public int EmpresaId { get; set; }
+    public Empresa Empresa { get; set; } = null!;
     public int EntregaId { get; set; }
     public EntregaDispositivo Entrega { get; set; } = null!;
 
