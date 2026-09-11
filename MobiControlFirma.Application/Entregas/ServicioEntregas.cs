@@ -187,12 +187,18 @@ public class ServicioEntregas(
 
     public async Task<PaginaDto<EntregaResumenDto>> ListarAsync(
         string? busqueda, DateOnly? desde, DateOnly? hasta, string? estadoProceso,
-        int pagina, int tamanoPagina, CancellationToken ct = default)
+        int? empresaId, int pagina, int tamanoPagina, CancellationToken ct = default)
     {
         pagina = Math.Max(1, pagina);
         tamanoPagina = Math.Clamp(tamanoPagina, 1, 200);
 
         var consulta = db.Entregas.AsNoTracking().AsQueryable();
+
+        // Solo acota lo que ya se puede ver: para un usuario de empresa el filtro global manda,
+        // así que pedir otra empresa aquí no le abre nada, simplemente devuelve vacío. Quien lo
+        // usa de verdad es el superadministrador, que ve todas y necesita mirarlas de a una.
+        if (empresaId is { } filtroEmpresa)
+            consulta = consulta.Where(e => e.EmpresaId == filtroEmpresa);
 
         if (TextoMobiControl.Normalizar(busqueda) is { } termino)
         {
@@ -224,6 +230,8 @@ public class ServicioEntregas(
             .Select(e => new EntregaResumenDto(
                 e.EntregaUid,
                 e.EntregaId,
+                e.EmpresaId,
+                e.Empresa.Nombre,
                 e.Dispositivo.MobiControlDeviceId,
                 e.Dispositivo.Fabricante,
                 e.Dispositivo.Modelo,
@@ -250,6 +258,8 @@ public class ServicioEntregas(
             .Select(e => new EntregaResumenDto(
                 e.EntregaUid,
                 e.EntregaId,
+                e.EmpresaId,
+                e.Empresa.Nombre,
                 e.Dispositivo.MobiControlDeviceId,
                 e.Dispositivo.Fabricante,
                 e.Dispositivo.Modelo,

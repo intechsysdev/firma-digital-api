@@ -77,6 +77,8 @@ public record ResultadoSincronizacionDto(string Proveedor, string Accion, bool E
 public record EntregaResumenDto(
     Guid EntregaUid,
     int EntregaId,
+    int EmpresaId,
+    string? Empresa,
     string DeviceId,
     string? Fabricante,
     string? Modelo,

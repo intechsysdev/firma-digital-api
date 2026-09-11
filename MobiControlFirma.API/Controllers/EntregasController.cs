@@ -53,10 +53,11 @@ public class EntregasController(IServicioEntregas entregas) : ControllerBase
         [FromQuery] DateOnly? desde,
         [FromQuery] DateOnly? hasta,
         [FromQuery] string? estadoProceso,
+        [FromQuery] int? empresaId,
         [FromQuery] int pagina = 1,
         [FromQuery] int tamanoPagina = 25,
         CancellationToken ct = default) =>
-        Ok(await entregas.ListarAsync(busqueda, desde, hasta, estadoProceso, pagina, tamanoPagina, ct));
+        Ok(await entregas.ListarAsync(busqueda, desde, hasta, estadoProceso, empresaId, pagina, tamanoPagina, ct));
 
     /// <summary>Detalle de un acta.</summary>
     [HttpGet("{entregaUid:guid}")]

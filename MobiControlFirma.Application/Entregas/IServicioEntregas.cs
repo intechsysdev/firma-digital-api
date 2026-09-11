@@ -19,7 +19,7 @@ public interface IServicioEntregas
     /// <summary>Listado de actas con filtros básicos, para el reporte administrativo.</summary>
     Task<PaginaDto<EntregaResumenDto>> ListarAsync(
         string? busqueda, DateOnly? desde, DateOnly? hasta, string? estadoProceso,
-        int pagina, int tamanoPagina, CancellationToken ct = default);
+        int? empresaId, int pagina, int tamanoPagina, CancellationToken ct = default);
 
     Task<EntregaResumenDto?> ObtenerAsync(Guid entregaUid, CancellationToken ct = default);
 
