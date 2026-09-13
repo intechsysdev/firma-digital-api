@@ -55,6 +55,28 @@ public class Empresa
         !string.IsNullOrWhiteSpace(MobiControlUsuario) &&
         !string.IsNullOrWhiteSpace(MobiControlPassword);
 
+    // ---- Copia del acta por correo ----
+
+    /// <summary>
+    /// Destinatarios fijos que reciben copia de cada acta, separados por coma o punto y coma.
+    /// Son los de la empresa —archivo, recursos humanos, soporte—; aparte de ellos el acta se
+    /// manda también al asociado, cuyo correo llega con cada firma.
+    /// </summary>
+    public string? CorreosCopia { get; set; }
+
+    public string? InfobipBaseUrl { get; set; }
+    public string? InfobipApiKey { get; set; }
+
+    /// <summary>Remitente. Su dominio tiene que estar verificado en la cuenta de Infobip.</summary>
+    public string? InfobipRemitente { get; set; }
+    public string? InfobipNombreRemitente { get; set; }
+
+    /// <summary>Sin esto el acta se firma y guarda igual; simplemente no se manda copia.</summary>
+    public bool CorreoConfigurado =>
+        !string.IsNullOrWhiteSpace(InfobipBaseUrl) &&
+        !string.IsNullOrWhiteSpace(InfobipApiKey) &&
+        !string.IsNullOrWhiteSpace(InfobipRemitente);
+
     public DateTime FechaCreacion { get; set; }
     public DateTime? FechaActualizacion { get; set; }
 }

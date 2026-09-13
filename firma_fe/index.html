@@ -953,6 +953,10 @@
                 deviceId: "%deviceid%",
                 usuario: "%CustomAttr:Usuario%",
                 cedula: "%CustomAttr:Cedula%",
+                // Atributo "Correo" de MobiControl: a esa dirección se manda la copia del
+                // acta. Si la consola no lo tiene definido llega sin resolver, el formulario
+                // lo descarta y la copia va solo a los destinatarios fijos de la empresa.
+                correo: "%CustomAttr:Correo%",
                 fabricante: "%MANUFACTURER%",
                 modelo: "%MODEL%",
                 imei: "%imei%",
@@ -1314,6 +1318,7 @@
                     cedula: valor("cedula"),
                     usuario: valor("usuario"),
                     nombreAsociado: $("campo-nombre").value.trim(),
+                    correo: valor("correo"),
                     fabricante: dato("fabricante"),
                     modelo: dato("modelo"),
                     imei: dato("imei"),

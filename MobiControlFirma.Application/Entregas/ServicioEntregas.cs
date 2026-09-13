@@ -81,6 +81,7 @@ public class ServicioEntregas(
             CanalId = canalId,
             DistritoId = distritoId,
             NombreAsociadoFirmante = nombreFirmante,
+            CorreoAsociado = TextoMobiControl.Normalizar(solicitud.Correo, 200),
             Entregables = TextoMobiControl.Normalizar(solicitud.Entregables),
             ICCID = TextoMobiControl.Normalizar(solicitud.Iccid, 50) ?? dispositivo.ICCID,
             NumeroCelular = TextoMobiControl.Normalizar(solicitud.NumeroCelular, 30) ?? dispositivo.NumeroCelular,
@@ -155,6 +156,8 @@ public class ServicioEntregas(
 
         db.Entregas.Add(entrega);
         await db.SaveChangesAsync(ct);
+
+        await EncolarCopiaAsync(entrega, ct);
 
         // Recién aquí se llama a MobiControl: fuera de la escritura del acta, para que una
         // consola lenta o caída no se lleve por delante una firma que ya está guardada.
@@ -513,4 +516,104 @@ public class ServicioEntregas(
     private static bool EsPng(byte[] contenido) =>
         contenido.Length > 8 &&
         contenido[0] == 0x89 && contenido[1] == 0x50 && contenido[2] == 0x4E && contenido[3] == 0x47;
+
+    /// <summary>
+    /// Deja la copia del acta en la bandeja de salida. No se envía aquí a propósito: el
+    /// asociado está esperando con el equipo en la mano y el acta ya está firmada y guardada;
+    /// un proveedor de correo lento no puede retrasar eso, ni un fallo suyo debe verse como si
+    /// la firma hubiera fallado.
+    /// </summary>
+    private async Task EncolarCopiaAsync(EntregaDispositivo entrega, CancellationToken ct)
+    {
+        var datosEmpresa = await db.Empresas
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.EmpresaId == entrega.EmpresaId, ct);
+
+        if (datosEmpresa is null) return;
+
+        var destinatarios = ResolverDestinatarios(datosEmpresa.CorreosCopia, entrega.CorreoAsociado);
+
+        if (destinatarios.Count == 0)
+        {
+            logger.LogInformation(
+                "El acta {Acta} no tiene destinatarios de copia: la empresa no configuró correos y el asociado no trae ninguno.",
+                entrega.EntregaUid);
+            return;
+        }
+
+        db.EnviosCorreo.Add(new EnvioCorreo
+        {
+            EmpresaId = entrega.EmpresaId,
+            EntregaId = entrega.EntregaId,
+            Destinatarios = string.Join(",", destinatarios),
+            Asunto = $"Acta de entrega {entrega.EntregaUid.ToString()[..8].ToUpperInvariant()} - {entrega.NombreAsociadoFirmante}",
+            Estado = EstadoEnvioCorreo.PENDIENTE,
+            FechaCreacion = DateTime.UtcNow,
+        });
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Junta los destinatarios fijos de la empresa con el correo del asociado, sin repetidos y
+    /// descartando lo que no parezca una dirección. Una entrada mal escrita en la configuración
+    /// haría que Infobip rechazara el envío entero, llevándose por delante a los demás.
+    /// </summary>
+    private static List<string> ResolverDestinatarios(string? correosEmpresa, string? correoAsociado)
+    {
+        var candidatos = (correosEmpresa ?? string.Empty)
+            .ReplaceLineEndings(",")
+            .Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Append(correoAsociado ?? string.Empty)
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Select(c => c.Trim());
+
+        var vistos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var salida = new List<string>();
+
+        foreach (var correo in candidatos)
+        {
+            if (!PareceCorreo(correo) || !vistos.Add(correo)) continue;
+            salida.Add(correo);
+        }
+
+        return salida;
+    }
+
+    private static bool PareceCorreo(string valor)
+    {
+        var arroba = valor.IndexOf('@');
+        return arroba > 0
+            && arroba < valor.Length - 1
+            && valor.IndexOf('@', arroba + 1) < 0
+            && valor.LastIndexOf('.') > arroba + 1
+            && !valor.Contains(' ');
+    }
+
+    public async Task<IReadOnlyList<EnvioCorreoDto>> ListarEnviosAsync(
+        Guid entregaUid, CancellationToken ct = default)
+    {
+        return await db.EnviosCorreo
+            .AsNoTracking()
+            .Where(e => e.Entrega.EntregaUid == entregaUid)
+            .OrderByDescending(e => e.EnvioId)
+            .Select(e => new EnvioCorreoDto(
+                e.EnvioId, e.Destinatarios, e.Asunto, e.Estado.ToString(),
+                e.Intentos, e.UltimoError, e.FechaCreacion, e.FechaEnvio))
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<EnvioCorreoDto>> ReencolarCopiaAsync(
+        Guid entregaUid, CancellationToken ct = default)
+    {
+        var entrega = await db.Entregas.FirstOrDefaultAsync(e => e.EntregaUid == entregaUid, ct)
+            ?? throw new ErrorSolicitudException("No existe un acta con ese identificador.");
+
+        // Se recalculan los destinatarios en vez de reusar los del envío anterior: si se
+        // reencola es justamente porque algo estaba mal, y muchas veces lo que estaba mal era
+        // la lista de correos de la empresa.
+        await EncolarCopiaAsync(entrega, ct);
+
+        return await ListarEnviosAsync(entregaUid, ct);
+    }
 }

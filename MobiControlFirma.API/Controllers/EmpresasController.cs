@@ -12,13 +12,18 @@ public record EmpresaDto(
     string ApiKeyPrefijo, DateTime? ApiKeyRotadaEn,
     bool MobiControlConfigurado, string? MobiControlBaseUrl,
     string? MobiControlUsuario, string MobiControlAtributoFirma, string MobiControlAtributoFecha,
-    int MobiControlTimeoutSegundos, int Actas, DateTime FechaCreacion);
+    int MobiControlTimeoutSegundos,
+    string? CorreosCopia, bool CorreoConfigurado,
+    string? InfobipBaseUrl, string? InfobipRemitente, string? InfobipNombreRemitente,
+    int Actas, DateTime FechaCreacion);
 
 public record EmpresaAltaRequest(
     string Nombre, string? Nit, string? CiudadFirma,
     string? MobiControlBaseUrl, string? MobiControlClientId, string? MobiControlClientSecret,
     string? MobiControlUsuario, string? MobiControlPassword,
-    string? MobiControlAtributoFirma, string? MobiControlAtributoFecha, int? MobiControlTimeoutSegundos);
+    string? MobiControlAtributoFirma, string? MobiControlAtributoFecha, int? MobiControlTimeoutSegundos,
+    string? CorreosCopia,
+    string? InfobipBaseUrl, string? InfobipApiKey, string? InfobipRemitente, string? InfobipNombreRemitente);
 
 /// <summary>La llave solo se muestra al crearla o al rotarla: después ya no se puede recuperar.</summary>
 public record EmpresaCreadaResponse(EmpresaDto Empresa, string ApiKeyDispositivo);
@@ -38,7 +43,10 @@ public class EmpresasController(ApplicationDbContext db) : ControllerBase
         e.ApiKeyPrefijo, e.ApiKeyRotadaEn,
         e.MobiControlConfigurado, e.MobiControlBaseUrl,
         e.MobiControlUsuario, e.MobiControlAtributoFirma, e.MobiControlAtributoFecha,
-        e.MobiControlTimeoutSegundos, actas, e.FechaCreacion);
+        e.MobiControlTimeoutSegundos,
+        e.CorreosCopia, e.CorreoConfigurado,
+        e.InfobipBaseUrl, e.InfobipRemitente, e.InfobipNombreRemitente,
+        actas, e.FechaCreacion);
 
     // El superadministrador no pertenece a ninguna empresa, así que el filtro global dejaría
     // estos conteos en cero: aquí se pide explícitamente ver por encima de él.
@@ -95,6 +103,11 @@ public class EmpresasController(ApplicationDbContext db) : ControllerBase
             MobiControlUsuario = solicitud.MobiControlUsuario?.Trim(),
             MobiControlPassword = solicitud.MobiControlPassword,
             MobiControlTimeoutSegundos = solicitud.MobiControlTimeoutSegundos ?? 20,
+            CorreosCopia = solicitud.CorreosCopia?.Trim(),
+            InfobipBaseUrl = solicitud.InfobipBaseUrl?.Trim(),
+            InfobipApiKey = solicitud.InfobipApiKey?.Trim(),
+            InfobipRemitente = solicitud.InfobipRemitente?.Trim(),
+            InfobipNombreRemitente = solicitud.InfobipNombreRemitente?.Trim(),
             FechaCreacion = DateTime.UtcNow,
         };
 
@@ -140,6 +153,16 @@ public class EmpresasController(ApplicationDbContext db) : ControllerBase
             empresa.MobiControlAtributoFecha = solicitud.MobiControlAtributoFecha.Trim();
         if (solicitud.MobiControlTimeoutSegundos is { } segundos)
             empresa.MobiControlTimeoutSegundos = segundos;
+
+        empresa.CorreosCopia = solicitud.CorreosCopia?.Trim();
+        empresa.InfobipBaseUrl = solicitud.InfobipBaseUrl?.Trim();
+        empresa.InfobipRemitente = solicitud.InfobipRemitente?.Trim();
+        empresa.InfobipNombreRemitente = solicitud.InfobipNombreRemitente?.Trim();
+
+        // Misma regla que el secreto de MobiControl: la llave no se muestra en la consola, así
+        // que si llegara vacía y se escribiera, editar cualquier otro campo la borraría.
+        if (!string.IsNullOrWhiteSpace(solicitud.InfobipApiKey))
+            empresa.InfobipApiKey = solicitud.InfobipApiKey.Trim();
 
         empresa.FechaActualizacion = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);

@@ -34,6 +34,7 @@ public class ApplicationDbContext(
     public DbSet<Firma> Firmas => Set<Firma>();
     public DbSet<DocumentoPdf> DocumentosPdf => Set<DocumentoPdf>();
     public DbSet<IntegracionSincronizacion> Sincronizaciones => Set<IntegracionSincronizacion>();
+    public DbSet<EnvioCorreo> EnviosCorreo => Set<EnvioCorreo>();
     public DbSet<IntegracionConfiguracion> ConfiguracionesIntegracion => Set<IntegracionConfiguracion>();
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -116,6 +117,7 @@ public class ApplicationDbContext(
 
             e.HasKey(x => x.EntregaId);
             e.Property(x => x.EntregaUid).HasDefaultValueSql("NEWID()");
+            e.Property(x => x.CorreoAsociado).HasMaxLength(200);
             e.HasIndex(x => x.EntregaUid).IsUnique();
 
             e.Property(x => x.NombreAsociadoFirmante).HasMaxLength(200).IsRequired();
@@ -265,7 +267,34 @@ public class ApplicationDbContext(
             e.Property(x => x.MobiControlAtributoFecha).HasMaxLength(100).IsRequired();
             e.Property(x => x.FechaCreacion).HasDefaultValueSql("SYSUTCDATETIME()");
 
+            e.Property(x => x.CorreosCopia).HasMaxLength(1000);
+            e.Property(x => x.InfobipBaseUrl).HasMaxLength(300);
+            e.Property(x => x.InfobipApiKey).HasMaxLength(300);
+            e.Property(x => x.InfobipRemitente).HasMaxLength(200);
+            e.Property(x => x.InfobipNombreRemitente).HasMaxLength(150);
+
             e.Ignore(x => x.MobiControlConfigurado);
+            e.Ignore(x => x.CorreoConfigurado);
+        });
+
+        // ---------------- Bandeja de salida de correos ----------------
+        builder.Entity<EnvioCorreo>(e =>
+        {
+            e.ToTable("EnviosCorreo");
+            e.HasKey(x => x.EnvioId);
+            e.Property(x => x.Destinatarios).HasMaxLength(1000).IsRequired();
+            e.Property(x => x.Asunto).HasMaxLength(300).IsRequired();
+            e.Property(x => x.Estado).HasConversion<string>().HasColumnType("varchar(20)").IsRequired();
+            e.Property(x => x.UltimoError).HasMaxLength(1000);
+            e.Property(x => x.FechaCreacion).HasDefaultValueSql("SYSUTCDATETIME()");
+
+            e.HasOne(x => x.Entrega).WithMany().HasForeignKey(x => x.EntregaId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Por aquí barre el proceso de fondo en cada vuelta: sin este índice acabaría
+            // recorriendo la tabla entera, que solo crece.
+            e.HasIndex(x => new { x.Estado, x.ProximoIntento })
+                .HasDatabaseName("IX_EnviosCorreo_Pendientes");
         });
 
         // ---------------- Aislamiento ----------------
@@ -282,6 +311,7 @@ public class ApplicationDbContext(
         ConfigurarPorEmpresa<DocumentoPdf>(builder);
         ConfigurarPorEmpresa<IntegracionSincronizacion>(builder);
         ConfigurarPorEmpresa<IntegracionConfiguracion>(builder);
+        ConfigurarPorEmpresa<EnvioCorreo>(builder);
     }
 
     private void ConfigurarPorEmpresa<T>(ModelBuilder builder) where T : class, IDeEmpresa

@@ -116,4 +116,21 @@ public class EntregasController(IServicioEntregas entregas) : ControllerBase
     public async Task<ActionResult<IReadOnlyList<ResultadoSincronizacionDto>>> Finalizar(
         Guid entregaUid, CancellationToken ct) =>
         Ok(await entregas.ReintentarSincronizacionAsync(entregaUid, ct));
+
+    /// <summary>Copias del acta enviadas por correo, con su estado y el último error si lo hubo.</summary>
+    [HttpGet("{entregaUid:guid}/correos")]
+    [ApiKey(RolApi.Administrador)]
+    public async Task<ActionResult<IReadOnlyList<EnvioCorreoDto>>> Correos(
+        Guid entregaUid, CancellationToken ct) =>
+        Ok(await entregas.ListarEnviosAsync(entregaUid, ct));
+
+    /// <summary>
+    /// Vuelve a encolar la copia. Sirve cuando se agotaron los reintentos automáticos o cuando
+    /// se corrigió la configuración de correo de la empresa después de firmar.
+    /// </summary>
+    [HttpPost("{entregaUid:guid}/correos/reenviar")]
+    [ApiKey(RolApi.Administrador)]
+    public async Task<ActionResult<IReadOnlyList<EnvioCorreoDto>>> Reenviar(
+        Guid entregaUid, CancellationToken ct) =>
+        Ok(await entregas.ReencolarCopiaAsync(entregaUid, ct));
 }

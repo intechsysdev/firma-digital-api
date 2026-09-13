@@ -38,6 +38,13 @@ public class EntregaDispositivo : IDeEmpresa
     /// <summary>Nombre tal como el asociado lo escribió en el formulario antes de firmar.</summary>
     public string NombreAsociadoFirmante { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Correo del asociado, tomado del atributo "Correo" de MobiControl al firmar. Se guarda en
+    /// el acta y no en el empleado porque es el que tenía en ese momento: si mañana cambia, la
+    /// copia enviada entonces sigue siendo trazable a la dirección que se usó.
+    /// </summary>
+    public string? CorreoAsociado { get; set; }
+
     public string? Entregables { get; set; }
 
     /// <summary>SIM instalada el día de la entrega (rota con cada cambio de línea).</summary>

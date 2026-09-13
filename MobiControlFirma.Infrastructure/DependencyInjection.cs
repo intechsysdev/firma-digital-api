@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using MobiControlFirma.Application.Common.Interfaces;
 using MobiControlFirma.Application.Entregas;
+using MobiControlFirma.Infrastructure.Correo;
 using MobiControlFirma.Infrastructure.Documentos;
 using MobiControlFirma.Infrastructure.MobiControl;
 using MobiControlFirma.Infrastructure.Persistence;
@@ -54,6 +55,17 @@ public static class DependencyInjection
         {
             cliente.Timeout = TimeSpan.FromMinutes(2);
         });
+
+        // ---- Copia del acta por correo ----
+        // Igual que MobiControl: sin BaseAddress, porque la URL de Infobip es propia de la
+        // cuenta de cada empresa.
+        services.AddHttpClient<IEnviadorCorreo, EnviadorCorreoInfobip>(cliente =>
+        {
+            cliente.Timeout = TimeSpan.FromSeconds(60);
+        });
+
+        // Vacía la bandeja de salida fuera del camino crítico de la firma.
+        services.AddHostedService<ServicioEnvioCorreos>();
 
         // ---- Caso de uso principal ----
         services.AddScoped<IServicioEntregas, ServicioEntregas>();

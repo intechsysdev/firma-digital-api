@@ -21,6 +21,21 @@ public enum ProveedorIntegracion
     GUPSHUP,
 }
 
+/// <summary>En qué punto va la copia del acta por correo.</summary>
+public enum EstadoEnvioCorreo
+{
+    /// <summary>Encolado. El acta ya está guardada; el correo sale aparte.</summary>
+    PENDIENTE,
+
+    ENVIADO,
+
+    /// <summary>Falló y se reintentará, salvo que se hayan agotado los intentos.</summary>
+    ERROR,
+
+    /// <summary>Se agotaron los reintentos. Queda a la espera de una acción manual.</summary>
+    DESCARTADO,
+}
+
 /// <summary>Forma en la que se autentica cada proveedor externo.</summary>
 public enum TipoAutenticacion
 {

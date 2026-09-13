@@ -23,6 +23,11 @@ public interface IServicioEntregas
 
     Task<EntregaResumenDto?> ObtenerAsync(Guid entregaUid, CancellationToken ct = default);
 
+    Task<IReadOnlyList<EnvioCorreoDto>> ListarEnviosAsync(Guid entregaUid, CancellationToken ct = default);
+
+    /// <summary>Vuelve a poner la copia en la bandeja, recalculando los destinatarios.</summary>
+    Task<IReadOnlyList<EnvioCorreoDto>> ReencolarCopiaAsync(Guid entregaUid, CancellationToken ct = default);
+
     Task<ArchivoDescargado?> DescargarPdfAsync(Guid entregaUid, CancellationToken ct = default);
 
     Task<ArchivoDescargado?> DescargarFirmaAsync(Guid entregaUid, CancellationToken ct = default);

@@ -47,3 +47,19 @@ public interface IClienteMobiControl
     Task<IReadOnlyList<ResultadoIntegracion>> MarcarEntregaFirmadaAsync(
         string deviceId, DateOnly fechaEntrega, CancellationToken ct = default);
 }
+
+/// <summary>Resultado de un intento de envío, para dejarlo registrado en la bandeja.</summary>
+public record ResultadoCorreo(bool Exitoso, int? CodigoHttp, string? Detalle);
+
+/// <summary>Manda la copia del acta a sus destinatarios.</summary>
+public interface IEnviadorCorreo
+{
+    Task<ResultadoCorreo> EnviarActaAsync(
+        MobiControlFirma.Domain.Entities.Empresa empresa,
+        IReadOnlyList<string> destinatarios,
+        string asunto,
+        string cuerpoHtml,
+        string nombreArchivo,
+        byte[] pdf,
+        CancellationToken ct = default);
+}

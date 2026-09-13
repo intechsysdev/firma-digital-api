@@ -24,6 +24,13 @@ public class RegistrarEntregaRequest
     [Required, MaxLength(200)]
     public string NombreAsociado { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Correo del asociado, del atributo "Correo" de MobiControl. Opcional: si el atributo no
+    /// está definido en la consola llega vacío y el acta se registra igual, solo que la copia
+    /// va únicamente a los destinatarios fijos de la empresa.
+    /// </summary>
+    [MaxLength(200)] public string? Correo { get; set; }
+
     [MaxLength(100)] public string? Fabricante { get; set; }
     [MaxLength(100)] public string? Modelo { get; set; }
     [MaxLength(50)]  public string? Imei { get; set; }
@@ -108,3 +115,14 @@ public record EstadoFirmaDispositivoDto(
     DateTime? FechaFirma,
     string? NombreAsociadoFirmante,
     string? UrlPdf);
+
+/// <summary>Una copia del acta en la bandeja de salida.</summary>
+public record EnvioCorreoDto(
+    int EnvioId,
+    string Destinatarios,
+    string Asunto,
+    string Estado,
+    int Intentos,
+    string? UltimoError,
+    DateTime FechaCreacion,
+    DateTime? FechaEnvio);

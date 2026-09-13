@@ -16,6 +16,7 @@ public interface IApplicationDbContext
     DbSet<Firma> Firmas { get; }
     DbSet<DocumentoPdf> DocumentosPdf { get; }
     DbSet<IntegracionSincronizacion> Sincronizaciones { get; }
+    DbSet<EnvioCorreo> EnviosCorreo { get; }
     DbSet<IntegracionConfiguracion> ConfiguracionesIntegracion { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
