@@ -88,7 +88,7 @@ jobs:
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'firmadigitalapi'
+          app-name: 'fiirmadigital-api'
           slot-name: 'Production'
           package: .
           # OneDeploy fusiona sobre lo que ya hay en wwwroot en vez de reemplazarlo. Sin esto
@@ -97,4 +97,4 @@ jobs:
           # página de bienvenida aunque los archivos nuevos ya estaban arriba.
           clean: true
           restart: true
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_A06969EB92CB4137BD6B4C0C9516B643 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_FIIRMADIGITAL_API }}
