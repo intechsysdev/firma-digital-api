@@ -3,9 +3,8 @@ namespace MobiControlFirma.API.Configuration;
 /// <summary>
 /// Conexión con One, el centralizador de empresas y configuración.
 ///
-/// La llave de firma es la misma con la que One firma sus tokens: este API no emite
-/// credenciales propias, solo verifica las que emitió One. Va por configuración de entorno y
-/// nunca en el repositorio.
+/// Este API no emite credenciales ni verifica firmas: delega en One tanto la autenticación de
+/// los usuarios como la configuración de cada empresa.
 /// </summary>
 public class OneOptions
 {
@@ -14,14 +13,11 @@ public class OneOptions
     /// <summary>Raíz del API de One, para consultar la configuración de cada empresa.</summary>
     public string BaseUrl { get; set; } = string.Empty;
 
-    public string Issuer { get; set; } = "one-api";
-    public string Audience { get; set; } = "one-front";
-
-    /// <summary>Secreto compartido con el que One firma sus tokens (HMAC-SHA256).</summary>
-    public string SigningKey { get; set; } = string.Empty;
-
-    public bool EstaConfigurado =>
-        !string.IsNullOrWhiteSpace(BaseUrl) && !string.IsNullOrWhiteSpace(SigningKey);
+    /// <summary>
+    /// No hay llave de firma a propósito: este API no verifica tokens, se los pasa a One para
+    /// que los valide. Así el secreto de la plataforma no tiene que viajar hasta aquí.
+    /// </summary>
+    public bool EstaConfigurado => !string.IsNullOrWhiteSpace(BaseUrl);
 }
 
 /// <summary>Claims y cabeceras del protocolo de One que este API entiende.</summary>

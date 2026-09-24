@@ -1,12 +1,8 @@
 using System.Text.Encodings.Web;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -53,39 +49,32 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // --- Usuarios de la consola (ASP.NET Identity sobre la misma base) ---
 // Los endpoints traen su propio esquema de token bearer, así que el front no maneja cookies
 // y puede vivir en cualquier origen sin depender de CSRF.
-// --- Identidad: la emite One, aquí solo se verifica ---
-// Este API no tiene usuarios propios. One firma sus tokens con HMAC y comparte la llave; de
-// cada token se leen las empresas del usuario y su rol en cada una.
+// --- Identidad: la emite y la valida One ---
+// Este API no tiene usuarios propios ni verifica firmas: reenvía el token a One y le pregunta
+// quién es. Verificar la firma aquí exigiría compartir la llave con la que One firma todos los
+// tokens de la plataforma, y este servicio se publica en un repositorio abierto.
 builder.Services.Configure<OneOptions>(builder.Configuration.GetSection(OneOptions.SectionName));
 var one = builder.Configuration.GetSection(OneOptions.SectionName).Get<OneOptions>() ?? new OneOptions();
 
 if (builder.Environment.IsProduction() && !one.EstaConfigurado)
 {
     throw new InvalidOperationException(
-        "Falta la sección 'One' (BaseUrl y SigningKey). Sin ella no se pueden validar los tokens " +
-        "del portal ni leer la configuración de las empresas.");
+        "Falta 'One:BaseUrl'. Sin One no hay forma de autenticar usuarios ni de resolver la " +
+        "configuración de cada empresa.");
 }
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(opciones =>
-    {
-        opciones.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidIssuer = one.Issuer,
-            ValidateAudience = true,
-            ValidAudience = one.Audience,
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(string.IsNullOrWhiteSpace(one.SigningKey)
-                    ? new string('0', 64)   // Solo para que el arranque no reviente en desarrollo.
-                    : one.SigningKey)),
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromSeconds(30),
-            RoleClaimType = ClaimTypes.Role,
-            NameClaimType = JwtRegisteredClaimNames.Email,
-        };
-    });
+builder.Services.AddHttpClient(ManejadorAutenticacionOne.ClienteHttp, cliente =>
+{
+    if (!string.IsNullOrWhiteSpace(one.BaseUrl))
+        cliente.BaseAddress = new Uri(one.BaseUrl.TrimEnd('/') + "/");
+
+    cliente.Timeout = TimeSpan.FromSeconds(15);
+});
+
+builder.Services
+    .AddAuthentication(ManejadorAutenticacionOne.Esquema)
+    .AddScheme<AuthenticationSchemeOptions, ManejadorAutenticacionOne>(
+        ManejadorAutenticacionOne.Esquema, _ => { });
 
 builder.Services.AddAuthorization();
 
