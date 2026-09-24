@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using MobiControlFirma.Application.Common.Interfaces;
 using MobiControlFirma.Application.Entregas;
+using MobiControlFirma.Application.Solicitudes;
+using MobiControlFirma.Infrastructure.Callbacks;
 using MobiControlFirma.Infrastructure.Correo;
 using MobiControlFirma.Infrastructure.Documentos;
 using MobiControlFirma.Infrastructure.MobiControl;
@@ -80,8 +82,19 @@ public static class DependencyInjection
         // Vacía la bandeja de salida fuera del camino crítico de la firma.
         services.AddHostedService<ServicioEnvioCorreos>();
 
-        // ---- Caso de uso principal ----
+        // ---- Aviso al sistema de origen cuando se firma una solicitud ----
+        // Sin BaseAddress: cada empresa configura su propia URL en One. El plazo es corto a
+        // propósito: un origen que tarda más de esto se reintenta en la siguiente vuelta.
+        services.AddHttpClient(ServicioCallbacks.ClienteHttp, cliente =>
+        {
+            cliente.Timeout = TimeSpan.FromSeconds(30);
+        });
+
+        services.AddHostedService<ServicioCallbacks>();
+
+        // ---- Casos de uso ----
         services.AddScoped<IServicioEntregas, ServicioEntregas>();
+        services.AddScoped<IServicioSolicitudes, ServicioSolicitudes>();
 
         return services;
     }

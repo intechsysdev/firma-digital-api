@@ -718,6 +718,95 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("MobiControlFirma.Domain.Entities.SolicitudFirma", b =>
+                {
+                    b.Property<int>("SolicitudId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SolicitudId"));
+
+                    b.Property<int?>("CodigoHttpCallback")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DatosOrigen")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("EntregaId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("varchar(20)")
+                        .HasDefaultValue("PENDIENTE");
+
+                    b.Property<string>("EstadoCallback")
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<DateTime?>("FechaCallback")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<DateTime?>("FechaFirma")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FechaVencimiento")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("IdSolicitudOrigen")
+                        .IsRequired()
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<int>("IntentosCallback")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ProximoIntentoCallback")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("SolicitudUid")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWID()");
+
+                    b.Property<string>("UltimoErrorCallback")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.HasKey("SolicitudId");
+
+                    b.HasIndex("EmpresaId");
+
+                    b.HasIndex("EntregaId")
+                        .IsUnique()
+                        .HasFilter("[EntregaId] IS NOT NULL");
+
+                    b.HasIndex("SolicitudUid")
+                        .IsUnique();
+
+                    b.HasIndex("EmpresaId", "IdSolicitudOrigen")
+                        .IsUnique()
+                        .HasDatabaseName("UQ_SolicitudesFirma_Origen");
+
+                    b.HasIndex("EstadoCallback", "ProximoIntentoCallback")
+                        .HasDatabaseName("IX_SolicitudesFirma_CallbacksPendientes");
+
+                    b.ToTable("SolicitudesFirma", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SolicitudesFirma_DatosJson", "ISJSON([DatosOrigen]) = 1");
+
+                            t.HasCheckConstraint("CK_SolicitudesFirma_Estado", "[Estado] IN ('PENDIENTE','FIRMADA')");
+                        });
+                });
+
             modelBuilder.Entity("MobiControlFirma.Domain.Entities.Canal", b =>
                 {
                     b.HasOne("MobiControlFirma.Domain.Entities.Empresa", "Empresa")
@@ -923,6 +1012,24 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
                         .HasForeignKey("EntregaId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("Entrega");
+                });
+
+            modelBuilder.Entity("MobiControlFirma.Domain.Entities.SolicitudFirma", b =>
+                {
+                    b.HasOne("MobiControlFirma.Domain.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MobiControlFirma.Domain.Entities.EntregaDispositivo", "Entrega")
+                        .WithMany()
+                        .HasForeignKey("EntregaId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Empresa");
 

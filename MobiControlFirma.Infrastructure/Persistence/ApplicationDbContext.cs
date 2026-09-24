@@ -34,6 +34,7 @@ public class ApplicationDbContext(
     public DbSet<IntegracionSincronizacion> Sincronizaciones => Set<IntegracionSincronizacion>();
     public DbSet<EnvioCorreo> EnviosCorreo => Set<EnvioCorreo>();
     public DbSet<IntegracionConfiguracion> ConfiguracionesIntegracion => Set<IntegracionConfiguracion>();
+    public DbSet<SolicitudFirma> Solicitudes => Set<SolicitudFirma>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -287,6 +288,48 @@ public class ApplicationDbContext(
                 .HasDatabaseName("IX_EnviosCorreo_Pendientes");
         });
 
+        // ---------------- Solicitudes de firma por enlace ----------------
+        builder.Entity<SolicitudFirma>(e =>
+        {
+            e.ToTable("SolicitudesFirma", t =>
+            {
+                t.HasCheckConstraint("CK_SolicitudesFirma_Estado", "[Estado] IN ('PENDIENTE','FIRMADA')");
+                t.HasCheckConstraint("CK_SolicitudesFirma_DatosJson", "ISJSON([DatosOrigen]) = 1");
+            });
+
+            e.HasKey(x => x.SolicitudId);
+            e.Property(x => x.SolicitudUid).HasDefaultValueSql("NEWID()");
+            e.HasIndex(x => x.SolicitudUid).IsUnique();
+
+            // Un reintento del origen con el mismo identificador no debe abrir un segundo enlace:
+            // la base lo impide aunque dos peticiones lleguen a la vez.
+            e.Property(x => x.IdSolicitudOrigen).HasColumnType("varchar(100)").IsRequired();
+            e.HasIndex(x => new { x.EmpresaId, x.IdSolicitudOrigen }).IsUnique()
+                .HasDatabaseName("UQ_SolicitudesFirma_Origen");
+
+            e.Property(x => x.DatosOrigen).HasColumnType("nvarchar(max)").IsRequired();
+
+            e.Property(x => x.Estado)
+                .HasConversion<string>()
+                .HasColumnType("varchar(20)")
+                .HasDefaultValue(EstadoSolicitud.PENDIENTE);
+
+            e.Property(x => x.FechaCreacion).HasDefaultValueSql("SYSUTCDATETIME()");
+
+            e.Property(x => x.EstadoCallback).HasConversion<string>().HasColumnType("varchar(20)");
+            e.Property(x => x.UltimoErrorCallback).HasMaxLength(1000);
+
+            // Por aquí barre el proceso de fondo que avisa al origen.
+            e.HasIndex(x => new { x.EstadoCallback, x.ProximoIntentoCallback })
+                .HasDatabaseName("IX_SolicitudesFirma_CallbacksPendientes");
+
+            // Un acta sale de una sola solicitud. Restringido: borrar el acta dejaría la
+            // solicitud diciendo que se firmó sin nada que lo respalde.
+            e.HasOne(x => x.Entrega).WithMany().HasForeignKey(x => x.EntregaId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => x.EntregaId).IsUnique().HasFilter("[EntregaId] IS NOT NULL");
+        });
+
         // ---------------- Aislamiento ----------------
         // Una sola vez, para todo lo que implementa IDeEmpresa: la columna, la llave foránea y
         // el filtro. Hacerlo entidad por entidad invita a que la próxima que se agregue quede
@@ -302,6 +345,7 @@ public class ApplicationDbContext(
         ConfigurarPorEmpresa<IntegracionSincronizacion>(builder);
         ConfigurarPorEmpresa<IntegracionConfiguracion>(builder);
         ConfigurarPorEmpresa<EnvioCorreo>(builder);
+        ConfigurarPorEmpresa<SolicitudFirma>(builder);
     }
 
     private void ConfigurarPorEmpresa<T>(ModelBuilder builder) where T : class, IDeEmpresa

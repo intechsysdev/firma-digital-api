@@ -21,6 +21,8 @@ public sealed record ConfiguracionEmpresa(
     string? InfobipRemitente,
     string? InfobipNombreRemitente,
     string CiudadFirma,
+    string? CallbackUrl,
+    string? CallbackSecreto,
     string ConfigVersion)
 {
     /// <summary>Sin consola configurada las actas se firman igual, solo quedan sin sincronizar.</summary>
@@ -35,6 +37,14 @@ public sealed record ConfiguracionEmpresa(
         !string.IsNullOrWhiteSpace(InfobipBaseUrl) &&
         !string.IsNullOrWhiteSpace(InfobipApiKey) &&
         !string.IsNullOrWhiteSpace(InfobipRemitente);
+
+    /// <summary>
+    /// A dónde avisar que una solicitud de firma se completó. Sin esto las firmas por enlace se
+    /// registran igual; el aviso queda en la bandeja reintentándose hasta que se configure.
+    /// </summary>
+    public bool CallbackConfigurado =>
+        Uri.TryCreate(CallbackUrl, UriKind.Absolute, out var url) &&
+        (url.Scheme == Uri.UriSchemeHttps || url.Scheme == Uri.UriSchemeHttp);
 }
 
 /// <summary>Resuelve la configuración de una empresa preguntándole a One.</summary>

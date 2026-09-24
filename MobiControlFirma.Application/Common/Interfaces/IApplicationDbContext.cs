@@ -18,6 +18,7 @@ public interface IApplicationDbContext
     DbSet<IntegracionSincronizacion> Sincronizaciones { get; }
     DbSet<EnvioCorreo> EnviosCorreo { get; }
     DbSet<IntegracionConfiguracion> ConfiguracionesIntegracion { get; }
+    DbSet<SolicitudFirma> Solicitudes { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

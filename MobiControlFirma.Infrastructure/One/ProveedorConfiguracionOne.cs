@@ -102,6 +102,8 @@ public class ProveedorConfiguracionOne(
             InfobipRemitente: V("INFOBIP_REMITENTE"),
             InfobipNombreRemitente: V("INFOBIP_NOMBRE_REMITENTE"),
             CiudadFirma: V("CIUDAD_FIRMA") ?? "Cali",
+            CallbackUrl: V("CALLBACK_URL"),
+            CallbackSecreto: V("CALLBACK_SECRET"),
             ConfigVersion: cuerpo.ConfigVersion ?? string.Empty);
     }
 

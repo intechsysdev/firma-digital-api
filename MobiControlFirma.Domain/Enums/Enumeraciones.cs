@@ -36,6 +36,34 @@ public enum EstadoEnvioCorreo
     DESCARTADO,
 }
 
+/// <summary>
+/// En qué punto va una solicitud de firma. El vencimiento no se guarda: se deduce de la fecha,
+/// así nadie tiene que pasar a marcarlas.
+/// </summary>
+public enum EstadoSolicitud
+{
+    /// <summary>El enlace está vivo y todavía nadie firmó.</summary>
+    PENDIENTE,
+
+    /// <summary>Se firmó y el acta ya existe.</summary>
+    FIRMADA,
+}
+
+/// <summary>En qué punto va el aviso al sistema de origen de que la firma se completó.</summary>
+public enum EstadoCallback
+{
+    /// <summary>Firmada y a la espera de avisar. El acta ya está guardada; el aviso sale aparte.</summary>
+    PENDIENTE,
+
+    ENVIADO,
+
+    /// <summary>Falló y se reintentará, salvo que se hayan agotado los intentos.</summary>
+    ERROR,
+
+    /// <summary>Se agotaron los reintentos. Queda a la espera de una acción manual.</summary>
+    DESCARTADO,
+}
+
 /// <summary>Forma en la que se autentica cada proveedor externo.</summary>
 public enum TipoAutenticacion
 {

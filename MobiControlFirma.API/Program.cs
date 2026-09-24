@@ -2,6 +2,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
@@ -82,6 +83,12 @@ builder.Services.AddAuthorization();
 // como los servicios de MobiControl y correo. Necesita el accessor para leer la petición viva.
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IContextoEmpresa, ContextoEmpresa>();
+
+// --- Enlaces de firma ---
+// El nombre de aplicación fija el anillo de llaves: sin él, dos despliegues del mismo API en
+// rutas distintas no se reconocerían los enlaces entre sí.
+builder.Services.AddDataProtection().SetApplicationName("MobiControlFirma");
+builder.Services.AddSingleton<IEnlacesFirma, EnlacesFirma>();
 
 // --- CORS ---
 // El formulario se instala en el equipo y el navegador lo abre desde el sistema de archivos,

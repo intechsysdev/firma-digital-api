@@ -11,6 +11,12 @@ public class AppOptions
     /// como "null"; ese caso se maneja aparte en Program.cs.
     /// </summary>
     public string[] CorsOrigins { get; set; } = [];
+
+    /// <summary>
+    /// Raíz del front de la consola. Los enlaces de firma apuntan a su ruta /firmar, así que sin
+    /// esto no se puede crear ninguna solicitud.
+    /// </summary>
+    public string? UrlFront { get; set; }
 }
 
 /// <summary>

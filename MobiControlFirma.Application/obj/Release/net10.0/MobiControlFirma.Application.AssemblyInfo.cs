@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MobiControlFirma.Application")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+757ff1fd316eeb58057e34df1f608f8c34a8f0a1")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e747ed5cba3afcdeeab0157d138f6acd1776aa71")]
 [assembly: System.Reflection.AssemblyProductAttribute("MobiControlFirma.Application")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MobiControlFirma.Application")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

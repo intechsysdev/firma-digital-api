@@ -24,7 +24,8 @@ public record VinculoCreadoResponse(VinculoDto Vinculo, string ApiKeyDispositivo
 public record ComprobacionDto(
     bool Alcanzable, string? TenantNombre, string? TenantSlug,
     bool MobiControlConfigurado, bool CorreoConfigurado,
-    string? MobiControlBaseUrl, string? InfobipRemitente, string? CorreosCopia, string? ConfigVersion);
+    string? MobiControlBaseUrl, string? InfobipRemitente, string? CorreosCopia, string? ConfigVersion,
+    bool CallbackConfigurado, string? CallbackUrl, bool CallbackFirmado);
 
 /// <summary>
 /// Vínculos entre este sistema y los tenants de One. No son empresas: las empresas se crean y se
@@ -137,12 +138,13 @@ public class VinculosController(
         var config = await configuracion.ObtenerAsync(empresaId, ct);
 
         if (config is null)
-            return Ok(new ComprobacionDto(false, null, null, false, false, null, null, null, null));
+            return Ok(new ComprobacionDto(false, null, null, false, false, null, null, null, null, false, null, false));
 
         return Ok(new ComprobacionDto(
             true, config.TenantNombre, config.TenantSlug,
             config.MobiControlConfigurado, config.CorreoConfigurado,
-            config.MobiControlBaseUrl, config.InfobipRemitente, config.CorreosCopia, config.ConfigVersion));
+            config.MobiControlBaseUrl, config.InfobipRemitente, config.CorreosCopia, config.ConfigVersion,
+            config.CallbackConfigurado, config.CallbackUrl, !string.IsNullOrWhiteSpace(config.CallbackSecreto)));
     }
 
     /// <summary>
