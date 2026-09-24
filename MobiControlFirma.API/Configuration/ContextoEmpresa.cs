@@ -43,8 +43,12 @@ public class ContextoEmpresa(IHttpContextAccessor acceso) : IContextoEmpresa
         {
             if (Contexto is null) return false;
 
-            if (Contexto.Items.TryGetValue(ClaveSuperAdmin, out var valor) && valor is true)
-                return true;
+            // Si la petición ya trae una decisión tomada, manda esa, sea cual sea. Antes solo se
+            // respetaba cuando era afirmativa, y entonces un administrador de plataforma que
+            // elegía una empresa concreta seguía viéndolas todas: el rol volvía a activar el
+            // modo transversal y el filtro global quedaba desactivado.
+            if (Contexto.Items.TryGetValue(ClaveSuperAdmin, out var valor) && valor is bool decidido)
+                return decidido;
 
             return Contexto.User.IsInRole(One.RolPlataforma);
         }
