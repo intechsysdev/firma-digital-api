@@ -7,6 +7,7 @@ using MobiControlFirma.Application.Entregas;
 using MobiControlFirma.Infrastructure.Correo;
 using MobiControlFirma.Infrastructure.Documentos;
 using MobiControlFirma.Infrastructure.MobiControl;
+using MobiControlFirma.Infrastructure.One;
 using MobiControlFirma.Infrastructure.Persistence;
 using MobiControlFirma.Infrastructure.Storage;
 using QuestPDF.Infrastructure;
@@ -54,6 +55,18 @@ public static class DependencyInjection
         services.AddHttpClient<IClienteMobiControl, ClienteMobiControl>(cliente =>
         {
             cliente.Timeout = TimeSpan.FromMinutes(2);
+        });
+
+        // ---- Configuración centralizada en One ----
+        // La URL base sale de la configuración del API; las credenciales, de cada empresa.
+        services.AddMemoryCache();
+        services.AddHttpClient<IProveedorConfiguracion, ProveedorConfiguracionOne>(cliente =>
+        {
+            var baseUrl = configuration["One:BaseUrl"];
+            if (!string.IsNullOrWhiteSpace(baseUrl))
+                cliente.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+
+            cliente.Timeout = TimeSpan.FromSeconds(20);
         });
 
         // ---- Copia del acta por correo ----

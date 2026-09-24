@@ -52,6 +52,7 @@ public class ServicioEnvioCorreos(
         using var ambito = fabricaAmbitos.CreateScope();
         var db = ambito.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var enviador = ambito.ServiceProvider.GetRequiredService<IEnviadorCorreo>();
+        var configuracion = ambito.ServiceProvider.GetRequiredService<IProveedorConfiguracion>();
         var almacenamiento = ambito.ServiceProvider.GetRequiredService<IAlmacenamientoArchivos>();
 
         var ahora = DateTime.UtcNow;
@@ -70,7 +71,7 @@ public class ServicioEnvioCorreos(
         if (pendientes.Count == 0) return;
 
         foreach (var envio in pendientes)
-            await ProcesarAsync(db, enviador, almacenamiento, envio, ct);
+            await ProcesarAsync(db, enviador, configuracion, almacenamiento, envio, ct);
 
         await db.SaveChangesAsync(ct);
     }
@@ -78,23 +79,27 @@ public class ServicioEnvioCorreos(
     private async Task ProcesarAsync(
         ApplicationDbContext db,
         IEnviadorCorreo enviador,
+        IProveedorConfiguracion configuracion,
         IAlmacenamientoArchivos almacenamiento,
         EnvioCorreo envio,
         CancellationToken ct)
     {
         envio.Intentos++;
 
-        var empresa = await db.Empresas.AsNoTracking()
-            .FirstOrDefaultAsync(e => e.EmpresaId == envio.EmpresaId, ct);
+        // La configuración es de One, no de la base local. Corre fuera de una petición, así que
+        // se pide por el EmpresaId que el envío ya trae decidido.
+        var config = await configuracion.ObtenerAsync(envio.EmpresaId, ct);
 
         var entrega = await db.Entregas.IgnoreQueryFilters().AsNoTracking()
             .Include(e => e.DocumentoPdf)
             .Include(e => e.Dispositivo)
             .FirstOrDefaultAsync(e => e.EntregaId == envio.EntregaId, ct);
 
-        if (empresa is null || entrega?.DocumentoPdf is null)
+        if (config is null || entrega?.DocumentoPdf is null)
         {
-            Marcar(envio, false, "No se encontró el acta o su empresa.");
+            Marcar(envio, false, config is null
+                ? "No se pudo obtener de One la configuración de la empresa."
+                : "No se encontró el acta o su documento.");
             return;
         }
 
@@ -111,8 +116,8 @@ public class ServicioEnvioCorreos(
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         var resultado = await enviador.EnviarActaAsync(
-            empresa, destinatarios, envio.Asunto,
-            CuerpoHtml(empresa, entrega), entrega.DocumentoPdf.NombreArchivo, pdf, ct);
+            config, destinatarios, envio.Asunto,
+            CuerpoHtml(config, entrega), entrega.DocumentoPdf.NombreArchivo, pdf, ct);
 
         Marcar(envio, resultado.Exitoso, resultado.Detalle);
 
@@ -149,7 +154,7 @@ public class ServicioEnvioCorreos(
         envio.ProximoIntento = DateTime.UtcNow.Add(Esperas[envio.Intentos - 1]);
     }
 
-    private static string CuerpoHtml(Empresa empresa, EntregaDispositivo entrega)
+    private static string CuerpoHtml(ConfiguracionEmpresa config, EntregaDispositivo entrega)
     {
         var equipo = string.Join(" ", new[] { entrega.Dispositivo?.Fabricante, entrega.Dispositivo?.Modelo }
             .Where(x => !string.IsNullOrWhiteSpace(x)));
@@ -162,7 +167,7 @@ public class ServicioEnvioCorreos(
               <tr><td style="padding:3px 12px 3px 0;color:#5b6a80">Equipo</td><td>{(string.IsNullOrWhiteSpace(equipo) ? "-" : equipo)}</td></tr>
               <tr><td style="padding:3px 12px 3px 0;color:#5b6a80">Fecha</td><td>{entrega.FechaFirma:yyyy-MM-dd HH:mm}</td></tr>
             </table>
-            <p style="color:#5b6a80;font-size:12px">{empresa.Nombre} · Mensaje automático, no responder.</p>
+            <p style="color:#5b6a80;font-size:12px">{config.TenantNombre} · Mensaje automático, no responder.</p>
             """;
     }
 }

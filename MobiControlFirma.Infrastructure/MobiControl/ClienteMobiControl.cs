@@ -51,7 +51,7 @@ public class MobiControlOptions
 /// </summary>
 public class ClienteMobiControl(
     HttpClient http,
-    IApplicationDbContext db,
+    IProveedorConfiguracion configuracion,
     IContextoEmpresa contextoEmpresa,
     ILogger<ClienteMobiControl> logger) : IClienteMobiControl
 {
@@ -63,40 +63,41 @@ public class ClienteMobiControl(
 
     private sealed record TokenEnCache(string Token, DateTime Expira);
 
-    private async Task<Empresa?> EmpresaAsync(CancellationToken ct)
+    private async Task<ConfiguracionEmpresa?> ConfigAsync(CancellationToken ct)
     {
         if (contextoEmpresa.EmpresaId is not { } id) return null;
-        return await db.Empresas.AsNoTracking().FirstOrDefaultAsync(e => e.EmpresaId == id, ct);
+        return await configuracion.ObtenerAsync(id, ct);
     }
 
     public async Task<bool> EstaConfiguradoAsync(CancellationToken ct = default) =>
-        await EmpresaAsync(ct) is { MobiControlConfigurado: true };
+        await ConfigAsync(ct) is { MobiControlConfigurado: true };
 
     public async Task<IReadOnlyList<ResultadoIntegracion>> MarcarEntregaFirmadaAsync(
         string deviceId, DateOnly fechaEntrega, CancellationToken ct = default)
     {
         var resultados = new List<ResultadoIntegracion>();
-        var empresa = await EmpresaAsync(ct);
+        var config = await ConfigAsync(ct);
 
-        if (empresa is null || !empresa.MobiControlConfigurado)
+        if (config is null || !config.MobiControlConfigurado)
         {
             resultados.Add(new ResultadoIntegracion(
                 TipoAccionIntegracion.ObtenerToken, false, null,
-                empresa is null
-                    ? "La petición no tiene empresa asociada."
-                    : $"La empresa {empresa.Nombre} no tiene configurada su consola de MobiControl."));
+                config is null
+                    ? "No se pudo obtener de One la configuración de la empresa."
+                    : $"El tenant {config.TenantNombre} no tiene configurada su consola de MobiControl en One."));
             return resultados;
         }
 
-        var (token, resultadoToken) = await ObtenerTokenAsync(empresa, ct);
+        var empresaId = contextoEmpresa.EmpresaRequerida;
+        var (token, resultadoToken) = await ObtenerTokenAsync(empresaId, config, ct);
         resultados.Add(resultadoToken);
         if (token is null) return resultados;
 
-        resultados.Add(await ActualizarAtributosAsync(empresa, token, deviceId, fechaEntrega, ct));
+        resultados.Add(await ActualizarAtributosAsync(empresaId, config, token, deviceId, fechaEntrega, ct));
 
         // El check-in se pide aunque la actualización de atributos haya fallado: es barato y,
         // si el fallo fue de red y no de datos, deja el equipo reportando igual.
-        resultados.Add(await CheckInAsync(empresa, token, deviceId, ct));
+        resultados.Add(await CheckInAsync(empresaId, config, token, deviceId, ct));
 
         return resultados;
     }
@@ -106,42 +107,42 @@ public class ClienteMobiControl(
     /// la ruta y las peticiones salen a /api/token en la raíz del host en vez de bajo
     /// /mobicontrol. Antes lo resolvía BaseAddress, que ya no sirve porque cada empresa tiene
     /// una consola distinta y el HttpClient es compartido.
-    private static Uri Ruta(Empresa empresa, string relativa) =>
-        new(new Uri(empresa.MobiControlBaseUrl!.TrimEnd('/') + "/"), relativa);
+    private static Uri Ruta(ConfiguracionEmpresa config, string relativa) =>
+        new(new Uri(config.MobiControlBaseUrl!.TrimEnd('/') + "/"), relativa);
 
     /// <summary>
     /// El asociado está esperando con el equipo en la mano: si la consola no responde, vale más
     /// cerrar el acta y reintentar la sincronización después que dejarlo colgado.
     /// </summary>
-    private static CancellationTokenSource ConLimite(Empresa empresa, CancellationToken ct)
+    private static CancellationTokenSource ConLimite(ConfiguracionEmpresa config, CancellationToken ct)
     {
         var fuente = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        fuente.CancelAfter(TimeSpan.FromSeconds(Math.Max(5, empresa.MobiControlTimeoutSegundos)));
+        fuente.CancelAfter(TimeSpan.FromSeconds(Math.Max(5, config.MobiControlTimeoutSegundos)));
         return fuente;
     }
 
     private async Task<(string? Token, ResultadoIntegracion Resultado)> ObtenerTokenAsync(
-        Empresa empresa, CancellationToken ct)
+        int empresaId, ConfiguracionEmpresa config, CancellationToken ct)
     {
         await Candado.WaitAsync(ct);
         try
         {
-            if (Tokens.TryGetValue(empresa.EmpresaId, out var enCache) && DateTime.UtcNow < enCache.Expira)
+            if (Tokens.TryGetValue(empresaId, out var enCache) && DateTime.UtcNow < enCache.Expira)
                 return (enCache.Token, new ResultadoIntegracion(TipoAccionIntegracion.ObtenerToken, true, null, "Token en caché."));
 
-            using var limite = ConLimite(empresa, ct);
-            using var peticion = new HttpRequestMessage(HttpMethod.Post, Ruta(empresa, "api/token"))
+            using var limite = ConLimite(config, ct);
+            using var peticion = new HttpRequestMessage(HttpMethod.Post, Ruta(config, "api/token"))
             {
                 Content = new FormUrlEncodedContent(new Dictionary<string, string>
                 {
                     ["grant_type"] = "password",
-                    ["username"] = empresa.MobiControlUsuario!,
-                    ["password"] = empresa.MobiControlPassword!,
+                    ["username"] = config.MobiControlUsuario!,
+                    ["password"] = config.MobiControlPassword!,
                 }),
             };
 
             var credencial = Convert.ToBase64String(
-                Encoding.UTF8.GetBytes($"{empresa.MobiControlClientId}:{empresa.MobiControlClientSecret}"));
+                Encoding.UTF8.GetBytes($"{config.MobiControlClientId}:{config.MobiControlClientSecret}"));
             peticion.Headers.Authorization = new AuthenticationHeaderValue("Basic", credencial);
 
             using var respuesta = await http.SendAsync(peticion, limite.Token);
@@ -150,7 +151,7 @@ public class ClienteMobiControl(
             if (!respuesta.IsSuccessStatusCode)
             {
                 var detalle = await LeerErrorAsync(respuesta, ct);
-                logger.LogError("MobiControl rechazó el token de {Empresa} ({Codigo}): {Detalle}", empresa.Nombre, codigo, detalle);
+                logger.LogError("MobiControl rechazó el token de {Empresa} ({Codigo}): {Detalle}", config.TenantNombre, codigo, detalle);
                 return (null, new ResultadoIntegracion(TipoAccionIntegracion.ObtenerToken, false, codigo, detalle));
             }
 
@@ -160,7 +161,7 @@ public class ClienteMobiControl(
                     TipoAccionIntegracion.ObtenerToken, false, codigo, "La respuesta no trajo access_token."));
 
             // Un minuto de colchón para no usar un token que caduca en pleno viaje.
-            Tokens[empresa.EmpresaId] = new TokenEnCache(
+            Tokens[empresaId] = new TokenEnCache(
                 contenido.AccessToken,
                 DateTime.UtcNow.AddSeconds(Math.Max(60, contenido.ExpiresIn) - 60));
 
@@ -168,7 +169,7 @@ public class ClienteMobiControl(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error obteniendo el token de MobiControl para {Empresa}.", empresa.Nombre);
+            logger.LogError(ex, "Error obteniendo el token de MobiControl para {Empresa}.", config.TenantNombre);
             return (null, new ResultadoIntegracion(TipoAccionIntegracion.ObtenerToken, false, null, ex.Message));
         }
         finally
@@ -178,36 +179,37 @@ public class ClienteMobiControl(
     }
 
     private async Task<ResultadoIntegracion> ActualizarAtributosAsync(
-        Empresa empresa, string token, string deviceId, DateOnly fechaEntrega, CancellationToken ct)
+        int empresaId, ConfiguracionEmpresa config, string token, string deviceId, DateOnly fechaEntrega,
+        CancellationToken ct)
     {
         var cuerpo = new
         {
             Attributes = new object[]
             {
-                new { AttributeName = empresa.MobiControlAtributoFirma, AttributeValue = (object)true },
-                new { AttributeName = empresa.MobiControlAtributoFecha, AttributeValue = (object)fechaEntrega.ToString("yyyy-MM-dd") },
+                new { AttributeName = config.MobiControlAtributoFirma, AttributeValue = (object)true },
+                new { AttributeName = config.MobiControlAtributoFecha, AttributeValue = (object)fechaEntrega.ToString("yyyy-MM-dd") },
             },
         };
 
         return await EnviarAsync(
-            empresa, HttpMethod.Put, $"api/devices/{Uri.EscapeDataString(deviceId)}/customAttributes",
+            empresaId, config, HttpMethod.Put, $"api/devices/{Uri.EscapeDataString(deviceId)}/customAttributes",
             cuerpo, token, TipoAccionIntegracion.ActualizarAtributos, ct);
     }
 
     private async Task<ResultadoIntegracion> CheckInAsync(
-        Empresa empresa, string token, string deviceId, CancellationToken ct) =>
+        int empresaId, ConfiguracionEmpresa config, string token, string deviceId, CancellationToken ct) =>
         await EnviarAsync(
-            empresa, HttpMethod.Post, $"api/devices/{Uri.EscapeDataString(deviceId)}/actions",
+            empresaId, config, HttpMethod.Post, $"api/devices/{Uri.EscapeDataString(deviceId)}/actions",
             new { Action = "CheckIn" }, token, TipoAccionIntegracion.CheckIn, ct);
 
     private async Task<ResultadoIntegracion> EnviarAsync(
-        Empresa empresa, HttpMethod metodo, string ruta, object cuerpo, string token, string accion,
-        CancellationToken ct)
+        int empresaId, ConfiguracionEmpresa config, HttpMethod metodo, string ruta, object cuerpo,
+        string token, string accion, CancellationToken ct)
     {
         try
         {
-            using var limite = ConLimite(empresa, ct);
-            using var peticion = new HttpRequestMessage(metodo, Ruta(empresa, ruta))
+            using var limite = ConLimite(config, ct);
+            using var peticion = new HttpRequestMessage(metodo, Ruta(config, ruta))
             {
                 Content = new StringContent(JsonSerializer.Serialize(cuerpo), Encoding.UTF8, "application/json"),
             };
@@ -221,10 +223,10 @@ public class ClienteMobiControl(
 
             // Un token revocado antes de tiempo se ve como 401: se descarta el de la caché para
             // que la siguiente acta vuelva a pedir uno en vez de repetir el mismo error.
-            if (codigo == 401) Tokens.TryRemove(empresa.EmpresaId, out _);
+            if (codigo == 401) Tokens.TryRemove(empresaId, out _);
 
             var detalle = await LeerErrorAsync(respuesta, ct);
-            logger.LogError("MobiControl falló en {Accion} para {Empresa} ({Codigo}): {Detalle}", accion, empresa.Nombre, codigo, detalle);
+            logger.LogError("MobiControl falló en {Accion} para {Empresa} ({Codigo}): {Detalle}", accion, config.TenantNombre, codigo, detalle);
             return new ResultadoIntegracion(accion, false, codigo, detalle);
         }
         catch (Exception ex)

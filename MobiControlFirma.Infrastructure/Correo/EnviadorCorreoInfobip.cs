@@ -15,7 +15,7 @@ namespace MobiControlFirma.Infrastructure.Correo;
 public class EnviadorCorreoInfobip(HttpClient http, ILogger<EnviadorCorreoInfobip> logger) : IEnviadorCorreo
 {
     public async Task<ResultadoCorreo> EnviarActaAsync(
-        Empresa empresa,
+        ConfiguracionEmpresa config,
         IReadOnlyList<string> destinatarios,
         string asunto,
         string cuerpoHtml,
@@ -23,19 +23,20 @@ public class EnviadorCorreoInfobip(HttpClient http, ILogger<EnviadorCorreoInfobi
         byte[] pdf,
         CancellationToken ct = default)
     {
-        if (!empresa.CorreoConfigurado)
-            return new ResultadoCorreo(false, null, $"La empresa {empresa.Nombre} no tiene configurado el envío de correos.");
+        if (!config.CorreoConfigurado)
+            return new ResultadoCorreo(false, null,
+                $"El tenant {config.TenantNombre} no tiene configurado el envío de correos en One.");
 
         if (destinatarios.Count == 0)
             return new ResultadoCorreo(false, null, "No hay destinatarios.");
 
         try
         {
-            var baseUrl = empresa.InfobipBaseUrl!.TrimEnd('/');
+            var baseUrl = config.InfobipBaseUrl!.TrimEnd('/');
 
             using var contenido = new MultipartFormDataContent
             {
-                { new StringContent(Remitente(empresa)), "from" },
+                { new StringContent(Remitente(config)), "from" },
                 { new StringContent(asunto), "subject" },
                 { new StringContent(cuerpoHtml), "html" },
             };
@@ -53,7 +54,7 @@ public class EnviadorCorreoInfobip(HttpClient http, ILogger<EnviadorCorreoInfobi
             {
                 Content = contenido,
             };
-            peticion.Headers.Authorization = new AuthenticationHeaderValue("App", empresa.InfobipApiKey);
+            peticion.Headers.Authorization = new AuthenticationHeaderValue("App", config.InfobipApiKey);
 
             using var respuesta = await http.SendAsync(peticion, ct);
             var codigo = (int)respuesta.StatusCode;
@@ -63,22 +64,22 @@ public class EnviadorCorreoInfobip(HttpClient http, ILogger<EnviadorCorreoInfobi
 
             var detalle = await LeerErrorAsync(respuesta, ct);
             logger.LogError("Infobip rechazó el correo de {Empresa} ({Codigo}): {Detalle}",
-                empresa.Nombre, codigo, detalle);
+                config.TenantNombre, codigo, detalle);
 
             return new ResultadoCorreo(false, codigo, detalle);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error enviando la copia del acta de {Empresa}.", empresa.Nombre);
+            logger.LogError(ex, "Error enviando la copia del acta de {Empresa}.", config.TenantNombre);
             return new ResultadoCorreo(false, null, ex.Message);
         }
     }
 
     /// <summary>Con nombre si lo hay: "Actas Intechsys &lt;actas@…&gt;" se lee mejor en la bandeja.</summary>
-    private static string Remitente(Empresa empresa) =>
-        string.IsNullOrWhiteSpace(empresa.InfobipNombreRemitente)
-            ? empresa.InfobipRemitente!
-            : $"{empresa.InfobipNombreRemitente} <{empresa.InfobipRemitente}>";
+    private static string Remitente(ConfiguracionEmpresa config) =>
+        string.IsNullOrWhiteSpace(config.InfobipNombreRemitente)
+            ? config.InfobipRemitente!
+            : $"{config.InfobipNombreRemitente} <{config.InfobipRemitente}>";
 
     private static async Task<string> LeerErrorAsync(HttpResponseMessage respuesta, CancellationToken ct)
     {

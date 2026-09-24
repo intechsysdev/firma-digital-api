@@ -55,7 +55,7 @@ public record ResultadoCorreo(bool Exitoso, int? CodigoHttp, string? Detalle);
 public interface IEnviadorCorreo
 {
     Task<ResultadoCorreo> EnviarActaAsync(
-        MobiControlFirma.Domain.Entities.Empresa empresa,
+        ConfiguracionEmpresa config,
         IReadOnlyList<string> destinatarios,
         string asunto,
         string cuerpoHtml,

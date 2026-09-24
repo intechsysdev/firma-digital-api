@@ -1,7 +1,5 @@
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using MobiControlFirma.Application.Common.Interfaces;
-using MobiControlFirma.Infrastructure.Identidad;
 using MobiControlFirma.Domain.Entities;
 using MobiControlFirma.Domain.Enums;
 
@@ -14,7 +12,7 @@ namespace MobiControlFirma.Infrastructure.Persistence;
 public class ApplicationDbContext(
     DbContextOptions<ApplicationDbContext> options,
     IContextoEmpresa? contextoEmpresa = null)
-    : IdentityDbContext<UsuarioAdmin>(options), IApplicationDbContext
+    : DbContext(options), IApplicationDbContext
 {
     // Se leen en cada consulta, no al construir el contexto: la empresa se resuelve cuando ya
     // se autenticó la petición, que puede ser después de que el contexto exista.
@@ -245,36 +243,28 @@ public class ApplicationDbContext(
         {
             e.ToTable("Empresas");
             e.HasKey(x => x.EmpresaId);
+
+            // Vínculo con One. Único porque un tenant no puede estar representado dos veces:
+            // serían dos compartimentos de datos para la misma empresa.
+            e.Property(x => x.OneTenantId).IsRequired();
+            e.HasIndex(x => x.OneTenantId).IsUnique().HasDatabaseName("UQ_Empresas_OneTenantId");
+
+            e.Property(x => x.OneSlug).HasMaxLength(120).IsRequired();
             e.Property(x => x.Nombre).HasMaxLength(150).IsRequired();
-            e.HasIndex(x => x.Nombre).IsUnique();
-            e.Property(x => x.Nit).HasMaxLength(30);
-            e.Property(x => x.CiudadFirma).HasMaxLength(100).IsRequired().HasDefaultValue("Cali");
+            e.Property(x => x.OneApiKey).HasMaxLength(200);
+            e.Property(x => x.OneApiSecret).HasMaxLength(200);
             e.Property(x => x.Activo).HasDefaultValue(true);
 
             e.Property(x => x.ApiKeyHash).HasColumnType("varbinary(32)").IsRequired();
             e.Property(x => x.ApiKeyPrefijo).HasMaxLength(12).IsRequired();
 
             // Por aquí entra cada acta que mandan los equipos: es la consulta más caliente del
-            // API y la única forma de resolver la empresa antes de tocar nada más.
+            // API y la única forma de resolver el tenant antes de tocar nada más.
             e.HasIndex(x => x.ApiKeyHash).IsUnique().HasDatabaseName("UQ_Empresas_ApiKeyHash");
 
-            e.Property(x => x.MobiControlBaseUrl).HasMaxLength(300);
-            e.Property(x => x.MobiControlClientId).HasMaxLength(200);
-            e.Property(x => x.MobiControlClientSecret).HasMaxLength(300);
-            e.Property(x => x.MobiControlUsuario).HasMaxLength(150);
-            e.Property(x => x.MobiControlPassword).HasMaxLength(300);
-            e.Property(x => x.MobiControlAtributoFirma).HasMaxLength(100).IsRequired();
-            e.Property(x => x.MobiControlAtributoFecha).HasMaxLength(100).IsRequired();
             e.Property(x => x.FechaCreacion).HasDefaultValueSql("SYSUTCDATETIME()");
 
-            e.Property(x => x.CorreosCopia).HasMaxLength(1000);
-            e.Property(x => x.InfobipBaseUrl).HasMaxLength(300);
-            e.Property(x => x.InfobipApiKey).HasMaxLength(300);
-            e.Property(x => x.InfobipRemitente).HasMaxLength(200);
-            e.Property(x => x.InfobipNombreRemitente).HasMaxLength(150);
-
-            e.Ignore(x => x.MobiControlConfigurado);
-            e.Ignore(x => x.CorreoConfigurado);
+            e.Ignore(x => x.OneConfigurado);
         });
 
         // ---------------- Bandeja de salida de correos ----------------

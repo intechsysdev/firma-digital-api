@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using MobiControlFirma.Application.Common.Interfaces;
-using MobiControlFirma.Infrastructure.Identidad;
 
 namespace MobiControlFirma.API.Configuration;
 
@@ -32,8 +31,9 @@ public class ContextoEmpresa(IHttpContextAccessor acceso) : IContextoEmpresa
             if (Contexto.Items.TryGetValue(ClaveEnContexto, out var valor) && valor is int id)
                 return id;
 
-            var claim = Contexto.User.FindFirst(ClaimsPropios.Empresa)?.Value;
-            return int.TryParse(claim, out var delToken) ? delToken : null;
+            // Para un usuario, la empresa la resuelve el middleware a partir de sus claims de
+            // One y la deja en Items: aquí no hay nada más que mirar.
+            return null;
         }
     }
 
@@ -46,7 +46,7 @@ public class ContextoEmpresa(IHttpContextAccessor acceso) : IContextoEmpresa
             if (Contexto.Items.TryGetValue(ClaveSuperAdmin, out var valor) && valor is true)
                 return true;
 
-            return Contexto.User.IsInRole(Roles.SuperAdministrador);
+            return Contexto.User.IsInRole(One.RolPlataforma);
         }
     }
 

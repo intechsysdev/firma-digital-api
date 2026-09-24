@@ -1,7 +1,12 @@
 using System.Text.Encodings.Web;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -30,16 +35,9 @@ var appOptions = builder.Configuration.GetSection(AppOptions.SectionName).Get<Ap
 var seguridad = builder.Configuration.GetSection(SeguridadOptions.SectionName).Get<SeguridadOptions>()
     ?? new SeguridadOptions();
 
-// Sin llaves configuradas el API queda abierto a internet: cualquiera podría registrar actas
-// falsas o leer el histórico completo de cédulas y firmas. En producción arranca reventando.
-if (builder.Environment.IsProduction() &&
-    (string.IsNullOrWhiteSpace(seguridad.ApiKeyDispositivo) ||
-     string.IsNullOrWhiteSpace(seguridad.ApiKeyAdministrador)))
-{
-    throw new InvalidOperationException(
-        "Faltan 'Seguridad:ApiKeyDispositivo' y/o 'Seguridad:ApiKeyAdministrador'. " +
-        "Sin ellas el API quedaría sin autenticación.");
-}
+// La llave de dispositivo dejó de ser global: ahora cada empresa tiene la suya, guardada como
+// resumen en su vínculo. Lo único que sigue siendo global es la de administración, y es
+// opcional: los usuarios vienen de One.
 
 // --- Controladores + JSON (enums como texto) ---
 builder.Services.AddControllers()
@@ -55,29 +53,41 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // --- Usuarios de la consola (ASP.NET Identity sobre la misma base) ---
 // Los endpoints traen su propio esquema de token bearer, así que el front no maneja cookies
 // y puede vivir en cualquier origen sin depender de CSRF.
-builder.Services.AddAuthorization();
+// --- Identidad: la emite One, aquí solo se verifica ---
+// Este API no tiene usuarios propios. One firma sus tokens con HMAC y comparte la llave; de
+// cada token se leen las empresas del usuario y su rol en cada una.
+builder.Services.Configure<OneOptions>(builder.Configuration.GetSection(OneOptions.SectionName));
+var one = builder.Configuration.GetSection(OneOptions.SectionName).Get<OneOptions>() ?? new OneOptions();
 
-// El contexto de empresa se resuelve por petición y lo consulta el contexto de datos para
-// filtrar: sin el accessor no habría de dónde sacarlo.
-builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<IContextoEmpresa, ContextoEmpresa>();
+if (builder.Environment.IsProduction() && !one.EstaConfigurado)
+{
+    throw new InvalidOperationException(
+        "Falta la sección 'One' (BaseUrl y SigningKey). Sin ella no se pueden validar los tokens " +
+        "del portal ni leer la configuración de las empresas.");
+}
 
-builder.Services
-    .AddIdentityApiEndpoints<UsuarioAdmin>(opciones =>
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(opciones =>
     {
-        opciones.User.RequireUniqueEmail = true;
-        opciones.Password.RequiredLength = 8;
-        // Bloqueo tras intentos fallidos: el API está expuesto a internet y la única barrera
-        // contra fuerza bruta sería el límite por IP, que un atacante rota sin esfuerzo.
-        opciones.Lockout.MaxFailedAccessAttempts = 5;
-        opciones.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
-    })
-    .AddRoles<IdentityRole>()
-    .AddEntityFrameworkStores<ApplicationDbContext>()
-    // Mete la empresa del usuario en su token, que es de donde la lee el filtro de datos.
-    .AddClaimsPrincipalFactory<FabricaClaimsUsuario>()
-    // Rechaza el ingreso de usuarios o empresas desactivados, que Identity no mira.
-    .AddSignInManager<GestorIngreso>();
+        opciones.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = one.Issuer,
+            ValidateAudience = true,
+            ValidAudience = one.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(string.IsNullOrWhiteSpace(one.SigningKey)
+                    ? new string('0', 64)   // Solo para que el arranque no reviente en desarrollo.
+                    : one.SigningKey)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30),
+            RoleClaimType = ClaimTypes.Role,
+            NameClaimType = JwtRegisteredClaimNames.Email,
+        };
+    });
+
+builder.Services.AddAuthorization();
 
 // --- CORS ---
 // El formulario se instala en el equipo y el navegador lo abre desde el sistema de archivos,
@@ -199,97 +209,9 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     await db.Database.MigrateAsync();
 
-    // Roles de la consola. Se crean si faltan y no se tocan si ya están.
-    var roles = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-    foreach (var rol in Roles.Todos)
-    {
-        if (!await roles.RoleExistsAsync(rol))
-            await roles.CreateAsync(new IdentityRole(rol));
-    }
-
-    // La configuración de MobiControl vivía en appsettings, una sola para todo el API. Ahora es
-    // de cada empresa: se traspasa a la primera —la que heredó los datos existentes— y solo si
-    // todavía no tiene la suya, para no pisar lo que se edite después desde la consola.
-    var mobiControl = scope.ServiceProvider.GetRequiredService<IOptions<MobiControlOptions>>().Value;
-    var primeraEmpresa = await db.Empresas.OrderBy(e => e.EmpresaId).FirstOrDefaultAsync();
-
-    if (primeraEmpresa is { MobiControlConfigurado: false } && mobiControl.EstaConfigurado)
-    {
-        primeraEmpresa.MobiControlBaseUrl = mobiControl.BaseUrl;
-        primeraEmpresa.MobiControlClientId = mobiControl.ClientId;
-        primeraEmpresa.MobiControlClientSecret = mobiControl.ClientSecret;
-        primeraEmpresa.MobiControlUsuario = mobiControl.Usuario;
-        primeraEmpresa.MobiControlPassword = mobiControl.Password;
-        primeraEmpresa.MobiControlAtributoFirma = mobiControl.AtributoFirma;
-        primeraEmpresa.MobiControlAtributoFecha = mobiControl.AtributoFecha;
-        primeraEmpresa.MobiControlTimeoutSegundos = mobiControl.TimeoutSegundos;
-        primeraEmpresa.FechaActualizacion = DateTime.UtcNow;
-
-        await db.SaveChangesAsync();
-    }
-
+    // Ya no se siembran usuarios ni roles: viven en One. Aquí solo quedan los estados base de
+    // cada empresa vinculada, que son datos del dominio de las actas.
     await ApplicationDbContextSeed.SeedAsync(db);
-
-    // Sin un superadministrador nadie puede crear empresas ni usuarios, y el sistema queda
-    // cerrado sobre sí mismo sin forma de abrirlo salvo tocando la base a mano. Pasa, por
-    // ejemplo, cuando los usuarios existían desde antes de que hubiera roles. La regla es
-    // simple: si no hay ninguno, el usuario más antiguo asume el papel.
-    {
-        var gestorUsuarios = scope.ServiceProvider.GetRequiredService<UserManager<UsuarioAdmin>>();
-        var bitacora = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-
-        var hayAlguno = (await gestorUsuarios.GetUsersInRoleAsync(Roles.SuperAdministrador)).Count > 0;
-
-        if (!hayAlguno && gestorUsuarios.Users.Any())
-        {
-            var masAntiguo = gestorUsuarios.Users
-                .OrderBy(u => u.FechaCreacion)
-                .ThenBy(u => u.Email)
-                .First();
-
-            masAntiguo.Activo = true;
-            masAntiguo.EmpresaId = null;
-            await gestorUsuarios.UpdateAsync(masAntiguo);
-            await gestorUsuarios.AddToRoleAsync(masAntiguo, Roles.SuperAdministrador);
-
-            bitacora.LogWarning(
-                "No había superadministrador: {Correo} asumió el rol.", masAntiguo.Email);
-        }
-    }
-
-    // Usuario inicial de la consola. Solo cuando la tabla está vacía: si ya hay usuarios, este
-    // bloque no toca nada, así que cambiar la contraseña en la consola no la revierte el
-    // siguiente despliegue.
-    if (!string.IsNullOrWhiteSpace(seguridad.UsuarioInicial) &&
-        !string.IsNullOrWhiteSpace(seguridad.ClaveInicial))
-    {
-        var usuarios = scope.ServiceProvider.GetRequiredService<UserManager<UsuarioAdmin>>();
-        var registroArranque = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-
-        if (!usuarios.Users.Any())
-        {
-            var inicial = new UsuarioAdmin
-            {
-                UserName = seguridad.UsuarioInicial,
-                Email = seguridad.UsuarioInicial,
-                EmailConfirmed = true,
-                NombreCompleto = "Superadministrador",
-                // Sin empresa a propósito: es quien las da de alta y las ve todas.
-                EmpresaId = null,
-            };
-
-            var creado = await usuarios.CreateAsync(inicial, seguridad.ClaveInicial);
-            if (creado.Succeeded)
-                await usuarios.AddToRoleAsync(inicial, Roles.SuperAdministrador);
-            var registro = registroArranque;
-
-            if (creado.Succeeded)
-                registro.LogInformation("Usuario inicial {Correo} creado.", seguridad.UsuarioInicial);
-            else
-                registro.LogError("No se pudo crear el usuario inicial: {Errores}",
-                    string.Join("; ", creado.Errors.Select(e => e.Description)));
-        }
-    }
 }
 
 app.UseSwagger();
@@ -304,6 +226,10 @@ app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Traduce el token de One a la empresa local. Va aquí: después de autenticar, porque lee
+// los claims, y antes de los controladores, porque el contexto de datos ya filtra con ello.
+app.UseMiddleware<ResolucionTenantMiddleware>();
 
 // Errores: los de validación salen como 400 con el mensaje que el formulario muestra tal cual;
 // el resto se registra y devuelve 500. Va después de UseCors para que la respuesta de error
@@ -341,26 +267,6 @@ app.Use(async (contexto, siguiente) =>
 app.UseRateLimiter();
 
 app.MapControllers().RequireRateLimiting(LimiteGeneral);
-
-var cuenta = app.MapGroup("/api/v1/cuenta").WithTags("Cuenta").RequireRateLimiting(LimiteCuenta);
-cuenta.MapIdentityApi<UsuarioAdmin>();
-
-// MapIdentityApi publica /register sin autenticación: tal cual, cualquiera en internet podría
-// crearse un usuario y entrar a la consola. Se exige estar dentro para dar de alta a otro.
-cuenta.AddEndpointFilter(async (contexto, siguiente) =>
-{
-    var ruta = contexto.HttpContext.Request.Path.Value ?? string.Empty;
-
-    if (ruta.EndsWith("/register", StringComparison.OrdinalIgnoreCase) &&
-        !ApiKeyAttribute.EsAdministrador(contexto.HttpContext))
-    {
-        return Results.Json(
-            new { message = "Solo un usuario autenticado puede registrar usuarios nuevos." },
-            statusCode: StatusCodes.Status401Unauthorized);
-    }
-
-    return await siguiente(contexto);
-});
 
 // Cualquier ruta que no sea del API la resuelve el front: React Router necesita que
 // /entregas/algo devuelva el index en vez de un 404 del servidor.

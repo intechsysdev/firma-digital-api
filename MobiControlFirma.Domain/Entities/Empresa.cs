@@ -1,81 +1,56 @@
 namespace MobiControlFirma.Domain.Entities;
 
 /// <summary>
-/// Cliente del sistema. Es la raíz del aislamiento: todo lo que se registra —actas, equipos,
-/// asociados y catálogos— pertenece a una empresa y nunca se cruza con el de otra.
+/// Vínculo con un tenant de One. Ya no es dueña de ninguna configuración: las credenciales de
+/// MobiControl, las de Infobip y los destinatarios de copia viven en One como variables de la
+/// app "firma-digital", y se piden a su API de integración.
+///
+/// Aquí solo queda lo que hace falta antes de poder hablar con One: a qué tenant pertenece cada
+/// fila de este sistema, qué llave llevan sus equipos, y con qué credencial preguntarle a One.
+/// La llave del dispositivo no puede vivir allá porque es justamente lo que se usa para saber
+/// de qué tenant es la petición que acaba de llegar.
 /// </summary>
 public class Empresa
 {
     public int EmpresaId { get; set; }
 
+    // ---- Identidad en One ----
+
+    /// <summary>Tenant de One dueño de estos datos. Es el vínculo con el registro central.</summary>
+    public Guid OneTenantId { get; set; }
+
+    /// <summary>Slug del tenant, copiado de One para poder mostrarlo sin ir a preguntar.</summary>
+    public string OneSlug { get; set; } = string.Empty;
+
+    /// <summary>Nombre del tenant, copia de conveniencia. La fuente de verdad es One.</summary>
     public string Nombre { get; set; } = string.Empty;
 
-    /// <summary>Identificación tributaria. Sirve para distinguir dos empresas de nombre parecido.</summary>
-    public string? Nit { get; set; }
+    // ---- Credencial para consultar la configuración en One ----
 
-    /// <summary>Ciudad que sale impresa en el acta cuando el formulario no manda otra.</summary>
-    public string CiudadFirma { get; set; } = "Cali";
+    /// <summary>Api key emitida por One para el par tenant–firma-digital.</summary>
+    public string? OneApiKey { get; set; }
 
-    public bool Activo { get; set; } = true;
+    /// <summary>Secreto de esa credencial. Nunca sale de este servidor.</summary>
+    public string? OneApiSecret { get; set; }
 
-    // ---- Llave del formulario instalado en los equipos ----
+    /// <summary>Sin credencial no hay configuración: las actas se firman pero no se sincronizan.</summary>
+    public bool OneConfigurado =>
+        !string.IsNullOrWhiteSpace(OneApiKey) && !string.IsNullOrWhiteSpace(OneApiSecret);
+
+    // ---- Llave que llevan los equipos ----
 
     /// <summary>
-    /// SHA-256 de la llave que llevan los equipos de esta empresa. Se guarda el resumen y no la
-    /// llave: quien lea la base no puede registrar actas a nombre de la empresa. La búsqueda
-    /// funciona igual porque el API calcula el resumen de lo que llega y compara por índice.
+    /// SHA-256 de la llave instalada en los equipos de este tenant. Se guarda el resumen y no la
+    /// llave: quien lea la base no puede registrar actas a nombre de la empresa.
     /// </summary>
     public byte[] ApiKeyHash { get; set; } = [];
 
-    /// <summary>
-    /// Primeros caracteres de la llave, en claro. Es lo único que la consola puede mostrar para
-    /// que un administrador reconozca cuál está instalada sin poder reconstruirla.
-    /// </summary>
+    /// <summary>Primeros caracteres, en claro, para reconocer cuál está instalada.</summary>
     public string ApiKeyPrefijo { get; set; } = string.Empty;
 
     public DateTime? ApiKeyRotadaEn { get; set; }
 
-    // ---- Consola de MobiControl propia de la empresa ----
-
-    public string? MobiControlBaseUrl { get; set; }
-    public string? MobiControlClientId { get; set; }
-    public string? MobiControlClientSecret { get; set; }
-    public string? MobiControlUsuario { get; set; }
-    public string? MobiControlPassword { get; set; }
-
-    public string MobiControlAtributoFirma { get; set; } = "Firma de entrega";
-    public string MobiControlAtributoFecha { get; set; } = "Fecha de entrega";
-    public int MobiControlTimeoutSegundos { get; set; } = 20;
-
-    /// <summary>Sin consola configurada las actas se guardan igual, pero quedan sin sincronizar.</summary>
-    public bool MobiControlConfigurado =>
-        !string.IsNullOrWhiteSpace(MobiControlBaseUrl) &&
-        !string.IsNullOrWhiteSpace(MobiControlClientId) &&
-        !string.IsNullOrWhiteSpace(MobiControlClientSecret) &&
-        !string.IsNullOrWhiteSpace(MobiControlUsuario) &&
-        !string.IsNullOrWhiteSpace(MobiControlPassword);
-
-    // ---- Copia del acta por correo ----
-
-    /// <summary>
-    /// Destinatarios fijos que reciben copia de cada acta, separados por coma o punto y coma.
-    /// Son los de la empresa —archivo, recursos humanos, soporte—; aparte de ellos el acta se
-    /// manda también al asociado, cuyo correo llega con cada firma.
-    /// </summary>
-    public string? CorreosCopia { get; set; }
-
-    public string? InfobipBaseUrl { get; set; }
-    public string? InfobipApiKey { get; set; }
-
-    /// <summary>Remitente. Su dominio tiene que estar verificado en la cuenta de Infobip.</summary>
-    public string? InfobipRemitente { get; set; }
-    public string? InfobipNombreRemitente { get; set; }
-
-    /// <summary>Sin esto el acta se firma y guarda igual; simplemente no se manda copia.</summary>
-    public bool CorreoConfigurado =>
-        !string.IsNullOrWhiteSpace(InfobipBaseUrl) &&
-        !string.IsNullOrWhiteSpace(InfobipApiKey) &&
-        !string.IsNullOrWhiteSpace(InfobipRemitente);
+    public bool Activo { get; set; } = true;
 
     public DateTime FechaCreacion { get; set; }
     public DateTime? FechaActualizacion { get; set; }

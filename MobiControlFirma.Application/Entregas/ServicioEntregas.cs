@@ -14,6 +14,7 @@ namespace MobiControlFirma.Application.Entregas;
 public class ServicioEntregas(
     IApplicationDbContext db,
     IContextoEmpresa empresa,
+    IProveedorConfiguracion configuracion,
     IAlmacenamientoArchivos almacenamiento,
     IGeneradorActaPdf generadorPdf,
     IClienteMobiControl mobiControl,
@@ -525,18 +526,15 @@ public class ServicioEntregas(
     /// </summary>
     private async Task EncolarCopiaAsync(EntregaDispositivo entrega, CancellationToken ct)
     {
-        var datosEmpresa = await db.Empresas
-            .AsNoTracking()
-            .FirstOrDefaultAsync(e => e.EmpresaId == entrega.EmpresaId, ct);
+        // Los destinatarios fijos viven en One, como variable de la app para este tenant.
+        var config = await configuracion.ObtenerAsync(entrega.EmpresaId, ct);
 
-        if (datosEmpresa is null) return;
-
-        var destinatarios = ResolverDestinatarios(datosEmpresa.CorreosCopia, entrega.CorreoAsociado);
+        var destinatarios = ResolverDestinatarios(config?.CorreosCopia, entrega.CorreoAsociado);
 
         if (destinatarios.Count == 0)
         {
             logger.LogInformation(
-                "El acta {Acta} no tiene destinatarios de copia: la empresa no configuró correos y el asociado no trae ninguno.",
+                "El acta {Acta} no tiene destinatarios de copia: no hay correos configurados en One para este tenant y el asociado no trae ninguno.",
                 entrega.EntregaUid);
             return;
         }
