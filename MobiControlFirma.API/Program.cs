@@ -78,6 +78,11 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+// La empresa de cada petición se resuelve una vez y la consultan tanto el contexto de datos
+// como los servicios de MobiControl y correo. Necesita el accessor para leer la petición viva.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IContextoEmpresa, ContextoEmpresa>();
+
 // --- CORS ---
 // El formulario se instala en el equipo y el navegador lo abre desde el sistema de archivos,
 // así que su Origin llega como "null" y ninguna lista blanca lo cubre. Con la lista vacía se
