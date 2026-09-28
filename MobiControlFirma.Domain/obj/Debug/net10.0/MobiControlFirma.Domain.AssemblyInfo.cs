@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MobiControlFirma.Domain")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e291ac26eb0dfd181f4061a387c2111387a41536")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+56a63fe5728e535052671cee4aec1634af36f591")]
 [assembly: System.Reflection.AssemblyProductAttribute("MobiControlFirma.Domain")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MobiControlFirma.Domain")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
