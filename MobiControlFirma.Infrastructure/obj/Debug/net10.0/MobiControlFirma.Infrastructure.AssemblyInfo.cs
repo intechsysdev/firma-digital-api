@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MobiControlFirma.Infrastructure")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+56a63fe5728e535052671cee4aec1634af36f591")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+787c6f04235acad7f8c8c90496fb90c6ea6712b7")]
 [assembly: System.Reflection.AssemblyProductAttribute("MobiControlFirma.Infrastructure")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MobiControlFirma.Infrastructure")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

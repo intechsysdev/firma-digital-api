@@ -21,3 +21,6 @@ F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.Domain\bin\De
 F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.Domain\bin\Debug\net10.0\MobiControlFirma.Domain.dll
 F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.Domain\bin\Debug\net10.0\MobiControlFirma.Domain.pdb
 F:\Intechsys_Proj\Firma_Digital\firma-digital-api\MobiControlFirma.Domain\obj\Debug\net10.0\ref\MobiControlFirma.Domain.dll
+C:\Users\Jeffo-PC\AppData\Local\Temp\firma-build-check\MobiControlFirma.Domain.deps.json
+C:\Users\Jeffo-PC\AppData\Local\Temp\firma-build-check\MobiControlFirma.Domain.dll
+C:\Users\Jeffo-PC\AppData\Local\Temp\firma-build-check\MobiControlFirma.Domain.pdb
