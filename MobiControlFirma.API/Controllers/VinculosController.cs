@@ -105,6 +105,17 @@ public class VinculosController(
         var vinculo = await db.Empresas.FirstOrDefaultAsync(e => e.EmpresaId == empresaId, ct);
         if (vinculo is null) return NotFound(new { message = "No existe ese vínculo." });
 
+        // Re-apuntar el vínculo a otro tenant conserva sus actas y la llave de los equipos. Casi
+        // siempre lo resuelve solo el primer ingreso (se adopta por slug), pero si el slug también
+        // cambió en One, esta es la forma de no abrir un compartimento vacío al lado.
+        if (solicitud.OneTenantId != Guid.Empty && solicitud.OneTenantId != vinculo.OneTenantId)
+        {
+            if (await db.Empresas.AnyAsync(e => e.OneTenantId == solicitud.OneTenantId && e.EmpresaId != empresaId, ct))
+                return BadRequest(new { message = "Ese tenant ya está vinculado a otra empresa." });
+
+            vinculo.OneTenantId = solicitud.OneTenantId;
+        }
+
         if (!string.IsNullOrWhiteSpace(solicitud.Nombre)) vinculo.Nombre = solicitud.Nombre.Trim();
         if (!string.IsNullOrWhiteSpace(solicitud.OneSlug)) vinculo.OneSlug = solicitud.OneSlug.Trim();
         if (!string.IsNullOrWhiteSpace(solicitud.OneApiKey)) vinculo.OneApiKey = solicitud.OneApiKey.Trim();

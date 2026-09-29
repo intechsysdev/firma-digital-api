@@ -89,6 +89,7 @@ builder.Services.AddScoped<IContextoEmpresa, ContextoEmpresa>();
 // rutas distintas no se reconocerían los enlaces entre sí.
 builder.Services.AddDataProtection().SetApplicationName("MobiControlFirma");
 builder.Services.AddSingleton<IEnlacesFirma, EnlacesFirma>();
+builder.Services.AddScoped<EmpresasOne>();
 
 // --- CORS ---
 // El formulario se instala en el equipo y el navegador lo abre desde el sistema de archivos,
@@ -240,6 +241,11 @@ app.Use(async (contexto, siguiente) =>
     try
     {
         await siguiente();
+    }
+    catch (OperationCanceledException) when (contexto.RequestAborted.IsCancellationRequested)
+    {
+        // El cliente se fue antes de la respuesta (cerró la pestaña, navegó a otra parte). No hay
+        // a quién contestarle ni nada que corregir: registrarlo como error solo mete ruido.
     }
     catch (ErrorSolicitudException ex)
     {

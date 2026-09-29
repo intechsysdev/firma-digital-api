@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MobiControlFirma.API.Configuration;
+using MobiControlFirma.Domain.Entities;
 using MobiControlFirma.Infrastructure.Persistence;
 
 namespace MobiControlFirma.API.Controllers;
@@ -15,27 +16,45 @@ public record SesionDto(
     IReadOnlyList<EmpresaAccesibleDto> Empresas);
 
 /// <summary>
-/// Quién es quien llama y a qué empresas alcanza. La consola lo consulta al entrar: el token de
-/// One trae los identificadores de las empresas del usuario, pero no sus nombres ni cuáles de
-/// ellas están vinculadas a este sistema.
+/// Quién es quien llama y a qué empresas alcanza. La consola lo consulta al entrar.
+///
+/// La respuesta la da One: las empresas que tienen la app asignada y de las que el usuario es
+/// miembro (todas las asignadas, si es de plataforma). Aquí solo se refleja esa lista y se crea
+/// la fila local de la empresa que entra por primera vez.
 /// </summary>
 [ApiController]
 [Route("api/v1/sesion")]
 [Authorize]
-public class SesionController(ApplicationDbContext db) : ControllerBase
+public class SesionController(ApplicationDbContext db, EmpresasOne empresasOne, ILogger<SesionController> logger) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<SesionDto>> Yo(CancellationToken ct)
     {
         var esPlataforma = User.IsInRole(One.RolPlataforma);
-        var pertenencias = ResolucionTenantMiddleware.Pertenencias(User);
+        var token = Request.Headers.Authorization.ToString()["Bearer ".Length..].Trim();
 
-        // Un administrador de plataforma alcanza todas las empresas vinculadas; el resto, solo
-        // aquellas en las que One dice que es miembro.
-        var consulta = db.Empresas.AsNoTracking().Where(e => e.Activo);
+        var enOne = await empresasOne.ConsultarAsync(token, ct);
 
-        if (!esPlataforma)
-            consulta = consulta.Where(e => pertenencias.Contains(e.OneTenantId));
+        IQueryable<Empresa> consulta;
+
+        if (enOne is not null)
+        {
+            await empresasOne.SincronizarAsync(enOne, ct);
+
+            var ids = enOne.Select(e => e.TenantId).ToList();
+            consulta = db.Empresas.AsNoTracking().Where(e => e.Activo && ids.Contains(e.OneTenantId));
+        }
+        else
+        {
+            // Si One no contesta esta consulta, se cae a lo que dice el token: las pertenencias
+            // contra los vínculos que ya existen. Así una falla de One no deja a nadie afuera de
+            // lo que ya tenía.
+            logger.LogWarning("Se usan las pertenencias del token porque One no devolvió las empresas de la app.");
+
+            var pertenencias = ResolucionTenantMiddleware.Pertenencias(User);
+            consulta = db.Empresas.AsNoTracking().Where(e => e.Activo);
+            if (!esPlataforma) consulta = consulta.Where(e => pertenencias.Contains(e.OneTenantId));
+        }
 
         var empresas = await consulta
             .OrderBy(e => e.Nombre)

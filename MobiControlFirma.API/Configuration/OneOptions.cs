@@ -13,6 +13,9 @@ public class OneOptions
     /// <summary>Raíz del API de One, para consultar la configuración de cada empresa.</summary>
     public string BaseUrl { get; set; } = string.Empty;
 
+    /// <summary>Slug de esta app en el catálogo de One. Con él se pregunta a qué empresas llega cada usuario.</summary>
+    public string AppSlug { get; set; } = "firma-digital";
+
     /// <summary>
     /// No hay llave de firma a propósito: este API no verifica tokens, se los pasa a One para
     /// que los valide. Así el secreto de la plataforma no tiene que viajar hasta aquí.
