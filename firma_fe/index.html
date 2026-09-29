@@ -931,14 +931,14 @@
                 // URL del API. Siempre https: el formulario se abre desde el disco del
                 // equipo y el App Service redirige http a https, pero un preflight de CORS no
                 // sigue redirecciones, así que con http las peticiones fallan antes de salir.
-                apiBaseUrl: "https://firmadigitalapi-dbg4dgbvfbgpekg4.centralus-01.azurewebsites.net",
+                apiBaseUrl: "https://fiirmadigital-api-a9hgbpetdqbtdxbw.centralus-01.azurewebsites.net",
 
-                // Llave de acceso del formulario. Lo ideal es publicarla como atributo
-                // personalizado en MobiControl (%CustomAttr:ApiKey%): así se rota desde la
-                // consola sin volver a desplegar el archivo en toda la flota. Si el atributo
-                // no existe, se usa la llave de respaldo escrita aquí abajo.
+                // Llave de la empresa dueña del equipo, publicada como atributo personalizado
+                // "ApiKey" en MobiControl. Es lo que le dice al API de qué empresa es el acta,
+                // así que no hay llave de respaldo: una llave común registraría las actas de
+                // todas las empresas en la misma. Se obtiene en la consola, en Vínculos, al
+                // crear el vínculo o al rotar la llave.
                 apiKeyAtributo: "%CustomAttr:ApiKey%",
-                apiKeyRespaldo: "dev-dispositivo-3f9a1c7e5b2d48a6",
 
                 ciudad: "Cali",
                 claveCola: "mcfirma.pendiente"
@@ -1194,7 +1194,7 @@
             var ultimaRespuesta = null;
 
             function apiKey() {
-                return sinResolver(CONFIG.apiKeyAtributo) ? CONFIG.apiKeyRespaldo : CONFIG.apiKeyAtributo.trim();
+                return sinResolver(CONFIG.apiKeyAtributo) ? "" : CONFIG.apiKeyAtributo.trim();
             }
 
             function url(ruta) {
@@ -1271,6 +1271,13 @@
                     $("btn-enviar").disabled = true;
                 }
 
+                if (!apiKey()) {
+                    mostrarAviso("error", "Falta la llave de la empresa. ",
+                        "El equipo no tiene el atributo ApiKey en MobiControl, así que el acta no se " +
+                        "puede registrar. TI debe cargarlo con la llave de la empresa (consola de actas, " +
+                        "Vínculos) y volver a abrir el formulario.");
+                }
+
                 if (datosFaltantes.length > 0) {
                     mostrarAviso("alerta", "Datos del equipo sin registrar. ",
                         "MobiControl no reportó: " + datosFaltantes.join(", ") + ". El acta se puede " +
@@ -1287,7 +1294,7 @@
             /** Avisa si el equipo ya tiene un acta firmada, para no duplicar la entrega. */
             function consultarEstadoPrevio() {
                 var id = valor("deviceId");
-                if (!id) return;
+                if (!id || !apiKey()) return;
 
                 fetch(url("/api/v1/entregas/dispositivo/" + encodeURIComponent(id)), {
                     headers: { "X-Api-Key": apiKey() }
@@ -1470,17 +1477,34 @@
                     headers: { "X-Api-Key": apiKey() }
                 }).then(function (respuesta) {
                     if (!respuesta.ok) throw new Error("No se pudo finalizar la entrega.");
+                    return respuesta.json();
+                }).then(function (resultados) {
+                    // El API responde 200 aunque MobiControl haya rechazado la marca: el acta está a
+                    // salvo y el detalle viene en la lista. Lo que cierra el formulario es el
+                    // atributo escrito, así que sin eso la entrega no está finalizada.
+                    var marcado = (resultados || []).some(function (r) {
+                        return r.accion === "ACTUALIZAR_ATRIBUTOS" && r.exitoso;
+                    });
+
+                    if (!marcado) {
+                        var error = new Error("MobiControl no confirmó la marca del equipo.");
+                        error.sinMarca = true;
+                        throw error;
+                    }
 
                     $("final-titulo").textContent = "Entrega finalizada";
                     $("final-texto").textContent =
                         "El equipo quedó liberado. Si el formulario no se cierra solo, ya puedes cerrarlo.";
                     $("final-nota").hidden = true;
                     boton.hidden = true;
-                }).catch(function () {
+                }).catch(function (error) {
                     // El acta ya está registrada: lo único pendiente es avisarle a MobiControl,
                     // así que se deja reintentar en vez de dar el proceso por perdido.
-                    alert("No se pudo finalizar la entrega en este momento." + "\n" +
-                        "El acta ya quedó guardada. Vuelve a intentarlo en unos segundos.");
+                    alert(error && error.sinMarca
+                        ? "El acta quedó guardada, pero MobiControl no marcó el equipo como entregado." + "\n" +
+                          "Vuelve a intentarlo; si sigue fallando, TI debe revisar la configuración de MobiControl de la empresa."
+                        : "No se pudo finalizar la entrega en este momento." + "\n" +
+                          "El acta ya quedó guardada. Vuelve a intentarlo en unos segundos.");
                     boton.disabled = false;
                     $("txt-finalizar").textContent = "Finalizar y liberar el equipo";
                 });
@@ -1553,7 +1577,7 @@
             // ======================================================================
             function actualizarBotonEnviar() {
                 var listo = $("chk-acepto").checked && tablero && !tablero.estaVacia();
-                $("btn-enviar").disabled = !listo || !valor("deviceId");
+                $("btn-enviar").disabled = !listo || !valor("deviceId") || !apiKey();
             }
 
             function iniciar() {
