@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MobiControlFirma.Infrastructure.Identidad;
 using MobiControlFirma.Infrastructure.Persistence;
@@ -27,11 +28,14 @@ public enum RolApi
 /// el archivo: así se rota desde la consola sin volver a desplegar el formulario.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
-public class ApiKeyAttribute(RolApi rolMinimo = RolApi.Dispositivo) : Attribute, IAuthorizationFilter
+public class ApiKeyAttribute(RolApi rolMinimo = RolApi.Dispositivo) : Attribute, IAsyncAuthorizationFilter
 {
     public const string NombreCabecera = "X-Api-Key";
 
-    public void OnAuthorization(AuthorizationFilterContext context)
+    /// <summary>Con esta cabecera, la llave es una credencial de One y no la de los equipos.</summary>
+    public const string CabeceraSecreto = "X-Api-Secret";
+
+    public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
         // Un usuario con sesión iniciada en la consola ya se identificó con credenciales
         // propias, que es una garantía mayor que una llave compartida: no se le pide además
@@ -72,15 +76,38 @@ public class ApiKeyAttribute(RolApi rolMinimo = RolApi.Dispositivo) : Attribute,
             return;
         }
 
+        var ct = context.HttpContext.RequestAborted;
+
+        // Credencial de One (api key + secreto): es como se integran los sistemas externos. One
+        // dice de qué empresa es, y solo vale si es de esta app.
+        var secreto = context.HttpContext.Request.Headers[CabeceraSecreto].FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(secreto))
+        {
+            var credenciales = context.HttpContext.RequestServices.GetRequiredService<CredencialesOne>();
+            var empresaOne = await credenciales.ResolverEmpresaAsync(enviada!.Trim(), secreto.Trim(), ct);
+
+            if (empresaOne is null)
+            {
+                context.Result = new UnauthorizedObjectResult(new
+                {
+                    message = "La credencial de One no es válida para Firma digital: revise que sea de esta app, que esté activa y que la empresa tenga la app asignada."
+                });
+                return;
+            }
+
+            context.HttpContext.Items[ContextoEmpresa.ClaveEnContexto] = empresaOne.Value;
+            return;
+        }
+
         // Llave de equipo: identifica a la empresa además de autenticar. Se busca por el
         // resumen, nunca por la llave, que no está guardada en ninguna parte.
         var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
         var resumen = LlavesDispositivo.Resumir(enviada!);
 
-        var empresaId = db.Empresas
+        var empresaId = await db.Empresas
             .Where(e => e.Activo && e.ApiKeyHash == resumen)
             .Select(e => (int?)e.EmpresaId)
-            .FirstOrDefault();
+            .FirstOrDefaultAsync(ct);
 
         if (empresaId is null)
         {

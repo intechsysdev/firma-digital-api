@@ -5,9 +5,10 @@ using MobiControlFirma.Application.Solicitudes;
 namespace MobiControlFirma.API.Controllers;
 
 /// <summary>
-/// Solicitudes de firma por enlace. Las crea el sistema de origen con la llave de la empresa
-/// —la misma de los equipos, que es la que dice de qué empresa es la petición— o un usuario de
-/// la consola con una empresa elegida.
+/// Solicitudes de firma por enlace. Las crea el sistema de origen con una credencial de One de la
+/// empresa para esta app (X-Api-Key + X-Api-Secret); también se aceptan la llave de los equipos o
+/// un usuario de la consola con una empresa elegida. La guía de uso está publicada en One, en la
+/// pestaña "Cómo integrar" de la app en cada empresa.
 /// </summary>
 [ApiController]
 [Route("api/v1/solicitudes")]

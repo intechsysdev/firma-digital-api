@@ -90,6 +90,7 @@ builder.Services.AddScoped<IContextoEmpresa, ContextoEmpresa>();
 builder.Services.AddDataProtection().SetApplicationName("MobiControlFirma");
 builder.Services.AddSingleton<IEnlacesFirma, EnlacesFirma>();
 builder.Services.AddScoped<EmpresasOne>();
+builder.Services.AddScoped<CredencialesOne>();
 
 // --- CORS ---
 // El formulario se instala en el equipo y el navegador lo abre desde el sistema de archivos,
