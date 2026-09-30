@@ -84,7 +84,21 @@ public class ApiKeyAttribute(RolApi rolMinimo = RolApi.Dispositivo) : Attribute,
         if (!string.IsNullOrWhiteSpace(secreto))
         {
             var credenciales = context.HttpContext.RequestServices.GetRequiredService<CredencialesOne>();
-            var empresaOne = await credenciales.ResolverEmpresaAsync(enviada!.Trim(), secreto.Trim(), ct);
+            int? empresaOne;
+            try
+            {
+                empresaOne = await credenciales.ResolverEmpresaAsync(enviada!.Trim(), secreto.Trim(), ct);
+            }
+            catch (OneNoDisponibleException)
+            {
+                // 503 y no 401: la credencial puede ser buena, y el sistema de origen debe
+                // reintentar en vez de creer que se la revocaron.
+                context.Result = new ObjectResult(new
+                {
+                    message = "No se pudo validar la credencial con One en este momento. Intente de nuevo en un minuto."
+                }) { StatusCode = StatusCodes.Status503ServiceUnavailable };
+                return;
+            }
 
             if (empresaOne is null)
             {

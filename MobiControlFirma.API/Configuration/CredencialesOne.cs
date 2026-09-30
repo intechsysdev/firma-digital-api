@@ -9,6 +9,9 @@ using MobiControlFirma.Infrastructure.Persistence;
 
 namespace MobiControlFirma.API.Configuration;
 
+/// <summary>One no contestó a tiempo: no se sabe si la credencial es buena, así que no se puede rechazar como mala.</summary>
+public class OneNoDisponibleException() : Exception("One no respondió a tiempo al validar la credencial.");
+
 /// <summary>
 /// Valida una credencial de integración emitida por One (api key + secreto) y la traduce a la
 /// empresa local. Es la forma en que un sistema externo llama a este API: la credencial se emite,
@@ -96,9 +99,22 @@ public class CredencialesOne(
 
             return new Verificacion(introspeccion.TenantId, introspeccion.TenantSlug);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            logger.LogError(ex, "No se pudo verificar la credencial contra One.");
+            // Es el límite del HttpClient, no el cliente que se fue: One está lento o reiniciando.
+            logger.LogWarning("One no respondió a tiempo al verificar una credencial.");
+            throw new OneNoDisponibleException();
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogError(ex, "No se pudo conectar con One para verificar la credencial.");
+            throw new OneNoDisponibleException();
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            // One contestó algo que no es la introspección esperada: no hay cómo dar por buena
+            // la credencial, y tampoco es una caída; se rechaza.
+            logger.LogError(ex, "One devolvió una verificación de credencial ilegible.");
             return null;
         }
     }
