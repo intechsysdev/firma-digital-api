@@ -104,6 +104,7 @@ public class ProveedorConfiguracionOne(
             CiudadFirma: V("CIUDAD_FIRMA") ?? "Cali",
             CallbackUrl: V("CALLBACK_URL"),
             CallbackSecreto: V("CALLBACK_SECRET"),
+            GoogleMapsApiKey: V("GOOGLE_MAPS_API_KEY"),
             ConfigVersion: cuerpo.ConfigVersion ?? string.Empty);
     }
 

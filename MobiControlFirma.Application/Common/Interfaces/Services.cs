@@ -46,7 +46,47 @@ public interface IClienteMobiControl
     /// </summary>
     Task<IReadOnlyList<ResultadoIntegracion>> MarcarEntregaFirmadaAsync(
         string deviceId, DateOnly fechaEntrega, CancellationToken ct = default);
+
+    // ---- Geolocalización ----
+    // Todas lanzan ErrorSolicitudException con un mensaje para el usuario cuando la empresa no
+    // tiene consola configurada o MobiControl no responde: quien consulta el mapa necesita saber
+    // por qué no ve nada, no una lista vacía.
+
+    /// <summary>Todos los equipos de la consola de la empresa, con su estado.</summary>
+    Task<IReadOnlyList<EquipoMobiControl>> ListarEquiposAsync(CancellationToken ct = default);
+
+    /// <summary>Última posición conocida, o null si el equipo nunca reportó una.</summary>
+    Task<UbicacionMobiControl?> UltimaUbicacionAsync(string deviceId, CancellationToken ct = default);
+
+    /// <summary>Puntos GPS recolectados entre dos momentos, en orden cronológico.</summary>
+    Task<IReadOnlyList<UbicacionMobiControl>> RecorridoAsync(
+        string deviceId, DateTimeOffset desde, DateTimeOffset hasta, CancellationToken ct = default);
+
+    /// <summary>Le pide al equipo que reporte su posición ahora. La respuesta llega después, no aquí.</summary>
+    Task LocalizarAsync(string deviceId, CancellationToken ct = default);
 }
+
+/// <summary>Un equipo tal como lo ve MobiControl, reducido a lo que usa Geolocalización.</summary>
+public record EquipoMobiControl(
+    string DeviceId,
+    string Nombre,
+    string? Plataforma,
+    string? Fabricante,
+    string? Modelo,
+    bool EnLinea,
+    int? Bateria,
+    bool? Cargando,
+    DateTimeOffset? UltimoReporte,
+    string? Grupo,
+    string? Imei,
+    string? Telefono)
+{
+    /// <summary>Solo teléfonos y tabletas reportan posición: pedirla a un Mac o a un PC es una llamada perdida.</summary>
+    public bool TieneGps => Plataforma is "Android" or "iOS";
+}
+
+public record UbicacionMobiControl(
+    double Latitud, double Longitud, DateTimeOffset Momento, double? Velocidad, double? Rumbo);
 
 /// <summary>Resultado de un intento de envío, para dejarlo registrado en la bandeja.</summary>
 public record ResultadoCorreo(bool Exitoso, int? CodigoHttp, string? Detalle);

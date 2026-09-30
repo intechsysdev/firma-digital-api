@@ -23,6 +23,7 @@ public sealed record ConfiguracionEmpresa(
     string CiudadFirma,
     string? CallbackUrl,
     string? CallbackSecreto,
+    string? GoogleMapsApiKey,
     string ConfigVersion)
 {
     /// <summary>Sin consola configurada las actas se firman igual, solo quedan sin sincronizar.</summary>

@@ -49,7 +49,7 @@ public class MobiControlOptions
 /// Cliente de la API de MobiControl: pide el token, marca los atributos personalizados del
 /// equipo y le fuerza un check-in para que el cambio se refleje de inmediato en la consola.
 /// </summary>
-public class ClienteMobiControl(
+public partial class ClienteMobiControl(
     HttpClient http,
     IProveedorConfiguracion configuracion,
     IContextoEmpresa contextoEmpresa,

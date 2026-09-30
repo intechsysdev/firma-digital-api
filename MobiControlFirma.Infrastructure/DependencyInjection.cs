@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using MobiControlFirma.Application.Common.Interfaces;
 using MobiControlFirma.Application.Entregas;
+using MobiControlFirma.Application.Geolocalizacion;
 using MobiControlFirma.Application.Solicitudes;
 using MobiControlFirma.Infrastructure.Callbacks;
 using MobiControlFirma.Infrastructure.Correo;
@@ -95,6 +96,7 @@ public static class DependencyInjection
         // ---- Casos de uso ----
         services.AddScoped<IServicioEntregas, ServicioEntregas>();
         services.AddScoped<IServicioSolicitudes, ServicioSolicitudes>();
+        services.AddScoped<IServicioGeolocalizacion, ServicioGeolocalizacion>();
 
         return services;
     }
