@@ -23,6 +23,12 @@ jobs:
         with:
           dotnet-version: '10.x'
 
+      # obj/ y bin/ estuvieron versionados con DLL ya compiladas. Tras el checkout todos los archivos
+      # tienen la misma fecha, y MSBuild podía dar por vigente una DLL vieja y no recompilar: el
+      # despliegue salía "correcto" con código de otra versión. Se borran siempre antes de compilar.
+      - name: Limpiar salidas de compilación
+        run: find . -type d \( -name obj -o -name bin \) -prune -exec rm -rf {} +
+
       - name: Build with dotnet
         run: dotnet build --configuration Release
 
@@ -61,6 +67,10 @@ jobs:
       # La carpeta obj/ está versionada y sus project.assets.json guardan rutas de Windows.
       # dotnet ef no restaura por su cuenta, así que sin esto lee esos archivos y muere
       # buscando la carpeta de paquetes de Visual Studio, que en el runner de Linux no existe.
+      # Igual que en el build: nada de salidas viejas del repo.
+      - name: Limpiar salidas de compilación
+        run: find . -type d \( -name obj -o -name bin \) -prune -exec rm -rf {} +
+
       - name: Restaurar dependencias
         run: dotnet restore MobiControlFirma.sln
 
