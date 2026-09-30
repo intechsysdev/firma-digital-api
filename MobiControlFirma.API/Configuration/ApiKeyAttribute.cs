@@ -84,12 +84,9 @@ public class ApiKeyAttribute(RolApi rolMinimo = RolApi.Dispositivo) : Attribute,
         if (!string.IsNullOrWhiteSpace(secreto))
         {
             var credenciales = context.HttpContext.RequestServices.GetRequiredService<CredencialesOne>();
-            int? empresaOne;
-            try
-            {
-                empresaOne = await credenciales.ResolverEmpresaAsync(enviada!.Trim(), secreto.Trim(), ct);
-            }
-            catch (OneNoDisponibleException)
+            var resultado = await credenciales.ResolverEmpresaAsync(enviada!.Trim(), secreto.Trim(), ct);
+
+            if (resultado.OneNoDisponible)
             {
                 // 503 y no 401: la credencial puede ser buena, y el sistema de origen debe
                 // reintentar en vez de creer que se la revocaron.
@@ -100,7 +97,7 @@ public class ApiKeyAttribute(RolApi rolMinimo = RolApi.Dispositivo) : Attribute,
                 return;
             }
 
-            if (empresaOne is null)
+            if (resultado.EmpresaId is not { } empresaOne)
             {
                 context.Result = new UnauthorizedObjectResult(new
                 {
@@ -109,7 +106,7 @@ public class ApiKeyAttribute(RolApi rolMinimo = RolApi.Dispositivo) : Attribute,
                 return;
             }
 
-            context.HttpContext.Items[ContextoEmpresa.ClaveEnContexto] = empresaOne.Value;
+            context.HttpContext.Items[ContextoEmpresa.ClaveEnContexto] = empresaOne;
             return;
         }
 

@@ -9,8 +9,16 @@ using MobiControlFirma.Infrastructure.Persistence;
 
 namespace MobiControlFirma.API.Configuration;
 
-/// <summary>One no contestó a tiempo: no se sabe si la credencial es buena, así que no se puede rechazar como mala.</summary>
-public class OneNoDisponibleException() : Exception("One no respondió a tiempo al validar la credencial.");
+/// <summary>Resultado de validar una credencial de One.</summary>
+/// <param name="EmpresaId">Empresa local de la credencial cuando es válida.</param>
+/// <param name="OneNoDisponible">
+/// One no contestó: no se sabe si la credencial es buena, así que no se puede rechazar como mala.
+/// </param>
+public sealed record ResultadoCredencial(int? EmpresaId, bool OneNoDisponible)
+{
+    public static readonly ResultadoCredencial Invalida = new(null, false);
+    public static readonly ResultadoCredencial SinOne = new(null, true);
+}
 
 /// <summary>
 /// Valida una credencial de integración emitida por One (api key + secreto) y la traduce a la
@@ -19,6 +27,9 @@ public class OneNoDisponibleException() : Exception("One no respondió a tiempo 
 ///
 /// One responde con su /integration/verify de qué empresa y de qué app es la credencial. Aquí solo
 /// se acepta si es de esta app: una credencial de otra app de la misma empresa no abre nada.
+///
+/// Devuelve un resultado en vez de lanzar excepciones: lo consume el filtro de llaves, por el que
+/// pasa cada petición de los equipos, y ahí conviene un flujo sin try/catch.
 /// </summary>
 public class CredencialesOne(
     IHttpClientFactory clientes,
@@ -34,8 +45,7 @@ public class CredencialesOne(
     /// </summary>
     private static readonly TimeSpan Vigencia = TimeSpan.FromMinutes(2);
 
-    /// <summary>Empresa local de la credencial, o null si One no la reconoce para esta app.</summary>
-    public async Task<int?> ResolverEmpresaAsync(string apiKey, string apiSecret, CancellationToken ct)
+    public async Task<ResultadoCredencial> ResolverEmpresaAsync(string apiKey, string apiSecret, CancellationToken ct)
     {
         // Se indexa por el resumen del par, no por el par: un volcado de memoria no debe dejar
         // credenciales completas a la vista.
@@ -43,9 +53,11 @@ public class CredencialesOne(
 
         if (!cache.TryGetValue<Verificacion>(clave, out var verificacion) || verificacion is null)
         {
-            verificacion = await VerificarAsync(apiKey, apiSecret, ct);
-            if (verificacion is null) return null;
+            var (resultado, oneRespondio) = await VerificarAsync(apiKey, apiSecret, ct);
+            if (!oneRespondio) return ResultadoCredencial.SinOne;
+            if (resultado is null) return ResultadoCredencial.Invalida;
 
+            verificacion = resultado;
             cache.Set(clave, verificacion, Vigencia);
         }
 
@@ -54,20 +66,28 @@ public class CredencialesOne(
             .Select(e => new { e.EmpresaId, e.Activo })
             .FirstOrDefaultAsync(ct);
 
-        if (existente is not null) return existente.Activo ? existente.EmpresaId : null;
+        if (existente is not null)
+            return existente.Activo ? new ResultadoCredencial(existente.EmpresaId, false) : ResultadoCredencial.Invalida;
 
         // La empresa todavía no tiene fila local: nadie de ella ha entrado a la consola. Se crea
         // igual que al primer ingreso; el nombre se corrige con el slug hasta que entre alguien.
         await empresasOne.SincronizarAsync(
             [new EmpresaEnOne(verificacion.TenantId, verificacion.TenantSlug, verificacion.TenantSlug, null)], ct);
 
-        return await db.Empresas.AsNoTracking()
+        var creada = await db.Empresas.AsNoTracking()
             .Where(e => e.OneTenantId == verificacion.TenantId && e.Activo)
             .Select(e => (int?)e.EmpresaId)
             .FirstOrDefaultAsync(ct);
+
+        return creada is null ? ResultadoCredencial.Invalida : new ResultadoCredencial(creada, false);
     }
 
-    private async Task<Verificacion?> VerificarAsync(string apiKey, string apiSecret, CancellationToken ct)
+    /// <summary>
+    /// La verificación, o null si One la rechazó; OneRespondio en false si One no contestó (caído,
+    /// reiniciando o lento), que no es lo mismo que una credencial mala.
+    /// </summary>
+    private async Task<(Verificacion? Resultado, bool OneRespondio)> VerificarAsync(
+        string apiKey, string apiSecret, CancellationToken ct)
     {
         try
         {
@@ -79,43 +99,45 @@ public class CredencialesOne(
 
             using var respuesta = await http.SendAsync(peticion, ct);
 
+            // 5xx es One con problemas, no la credencial: se trata igual que no contestar.
+            if ((int)respuesta.StatusCode >= 500)
+            {
+                logger.LogWarning("One respondió {Codigo} al verificar una credencial.", (int)respuesta.StatusCode);
+                return (null, false);
+            }
+
             if (!respuesta.IsSuccessStatusCode)
             {
                 logger.LogInformation("One rechazó una credencial de integración ({Codigo}).", (int)respuesta.StatusCode);
-                return null;
+                return (null, true);
             }
 
             var introspeccion = await respuesta.Content.ReadFromJsonAsync<Introspeccion>(ct);
 
             if (introspeccion is not { Active: true })
-                return null;
+                return (null, true);
 
             if (!string.Equals(introspeccion.AppSlug, opciones.Value.AppSlug, StringComparison.OrdinalIgnoreCase))
             {
                 logger.LogWarning("Se presentó una credencial de One de la app {App}, no de {Esperada}.",
                     introspeccion.AppSlug, opciones.Value.AppSlug);
-                return null;
+                return (null, true);
             }
 
-            return new Verificacion(introspeccion.TenantId, introspeccion.TenantSlug);
+            return (new Verificacion(introspeccion.TenantId, introspeccion.TenantSlug), true);
         }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            // Es el límite del HttpClient, no el cliente que se fue: One está lento o reiniciando.
-            logger.LogWarning("One no respondió a tiempo al verificar una credencial.");
-            throw new OneNoDisponibleException();
-        }
-        catch (HttpRequestException ex)
-        {
-            logger.LogError(ex, "No se pudo conectar con One para verificar la credencial.");
-            throw new OneNoDisponibleException();
-        }
-        catch (System.Text.Json.JsonException ex)
-        {
-            // One contestó algo que no es la introspección esperada: no hay cómo dar por buena
-            // la credencial, y tampoco es una caída; se rechaza.
-            logger.LogError(ex, "One devolvió una verificación de credencial ilegible.");
-            return null;
+            // Un JSON ilegible es One contestando mal: se rechaza. Cualquier otra cosa —el límite
+            // del HttpClient, un error de red— es One sin contestar.
+            if (ex is System.Text.Json.JsonException)
+            {
+                logger.LogError(ex, "One devolvió una verificación de credencial ilegible.");
+                return (null, true);
+            }
+
+            logger.LogWarning(ex, "One no respondió al verificar una credencial.");
+            return (null, false);
         }
     }
 

@@ -267,6 +267,11 @@ app.Use(async (contexto, siguiente) =>
             contexto.Response.Clear();
             contexto.Response.StatusCode = StatusCodes.Status500InternalServerError;
             var mensaje = ex.InnerException?.Message ?? ex.Message;
+
+            // Un InvalidProgramException es el runtime rechazando el código de un método: sin decir
+            // cuál, solo se podría adivinar. El nombre del método no expone datos.
+            if ((ex as InvalidProgramException ?? ex.InnerException as InvalidProgramException) is { } invalido)
+                mensaje += $" [{invalido.TargetSite?.DeclaringType?.FullName}.{invalido.TargetSite?.Name}]";
             await contexto.Response.WriteAsJsonAsync(new { message = mensaje });
         }
     }

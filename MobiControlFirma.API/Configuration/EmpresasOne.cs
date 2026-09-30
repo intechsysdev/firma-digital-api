@@ -52,14 +52,10 @@ public class EmpresasOne(
 
             return await respuesta.Content.ReadFromJsonAsync<List<EmpresaEnOne>>(ct) ?? [];
         }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            // Límite del HttpClient: One está lento o reiniciando. Quien llama cae al respaldo.
-            logger.LogWarning("One no respondió a tiempo con las empresas del usuario.");
-            return null;
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
+            // Incluye el límite del HttpClient (One lento o reiniciando): quien llama cae al
+            // respaldo por las pertenencias del token. Solo se propaga si se fue el cliente.
             logger.LogError(ex, "No se pudieron consultar en One las empresas del usuario.");
             return null;
         }
