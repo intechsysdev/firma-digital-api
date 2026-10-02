@@ -93,6 +93,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: .net-app
+          path: app
+
+      # OneDeploy (type: zip) recibe un .zip. Se arma aquí para no depender de que la acción
+      # comprima la carpeta por su cuenta.
+      - name: Empaquetar
+        run: cd app && zip -qr ../app.zip .
 
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
@@ -100,7 +106,12 @@ jobs:
         with:
           app-name: 'fiirmadigital-api'
           slot-name: 'Production'
-          package: .
+          package: app.zip
+          # Sin "type" la acción usa ZipDeploy, que ignora clean y restart: copiaba las DLL nuevas
+          # encima de las que el proceso tenía abiertas y no reiniciaba la app, y en Linux el
+          # proceso viejo leía archivos a medio reemplazar ("invalid program", "bad binary
+          # signature"). Con type: zip usa OneDeploy, que sí limpia y reinicia.
+          type: zip
           # OneDeploy fusiona sobre lo que ya hay en wwwroot en vez de reemplazarlo. Sin esto
           # sobrevivía el runtimeconfig.json de Infrastructure de un despliegue anterior, y con
           # dos candidatos App Service no sabía qué arrancar: el sitio se quedó sirviendo la
