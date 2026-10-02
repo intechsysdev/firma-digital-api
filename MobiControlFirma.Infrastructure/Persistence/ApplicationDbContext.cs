@@ -87,8 +87,14 @@ public class ApplicationDbContext(
         {
             e.ToTable("Dispositivos");
             e.HasKey(x => x.DispositivoId);
-            e.Property(x => x.MobiControlDeviceId).HasColumnType("varchar(100)").IsRequired();
-            e.HasIndex(x => new { x.EmpresaId, x.MobiControlDeviceId }).IsUnique();
+            // Filtrado: un equipo que no está en MobiControl no tiene DeviceId, y varios pueden
+            // estar así a la vez.
+            e.Property(x => x.MobiControlDeviceId).HasColumnType("varchar(100)");
+            e.HasIndex(x => new { x.EmpresaId, x.MobiControlDeviceId }).IsUnique()
+                .HasFilter("[MobiControlDeviceId] IS NOT NULL");
+            e.Property(x => x.TipoDispositivo).HasMaxLength(30);
+            e.Property(x => x.Serial).HasColumnType("varchar(100)");
+            e.HasIndex(x => new { x.EmpresaId, x.Serial }).IsUnique().HasFilter("[Serial] IS NOT NULL");
             e.Property(x => x.Fabricante).HasMaxLength(100);
             e.Property(x => x.Modelo).HasMaxLength(100);
             e.Property(x => x.IMEI).HasColumnType("varchar(50)");

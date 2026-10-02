@@ -184,6 +184,8 @@ public class GeneradorActaPdf : IGeneradorActaPdf
                     c.RelativeColumn();
                 });
 
+                if (datos.TipoDispositivo is not null || datos.Serial is not null)
+                    Fila(tabla, "Tipo de equipo", datos.TipoDispositivo, "Serial", datos.Serial);
                 Fila(tabla, "Marca", datos.Fabricante, "Modelo", datos.Modelo);
                 Fila(tabla, "IMEI", datos.Imei, "SIMCARD", datos.Iccid);
                 Fila(tabla, "No. Celular", datos.NumeroCelular, "Estado", datos.Estado);

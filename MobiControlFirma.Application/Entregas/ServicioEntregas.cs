@@ -29,8 +29,14 @@ public class ServicioEntregas(
     public async Task<EntregaCreadaResponse> RegistrarAsync(
         RegistrarEntregaRequest solicitud, string? ipOrigen, string? userAgent, CancellationToken ct = default)
     {
-        var deviceId = TextoMobiControl.Normalizar(solicitud.DeviceId, 100)
-            ?? throw new ErrorSolicitudException("El equipo no envió su identificador de MobiControl (%deviceid%).");
+        // El equipo se identifica por su DeviceId de MobiControl, o si no lo hay, por IMEI o
+        // serial. Sin ninguno no hay forma de saber qué se está entregando.
+        var deviceId = TextoMobiControl.Normalizar(solicitud.DeviceId, 100);
+        if (deviceId is null
+            && TextoMobiControl.Normalizar(solicitud.Imei, 50) is null
+            && TextoMobiControl.Normalizar(solicitud.Serial, 100) is null)
+            throw new ErrorSolicitudException(
+                "El acta necesita identificar el equipo: el identificador de MobiControl (%deviceid%), el IMEI o el serial.");
 
         var cedula = TextoMobiControl.Normalizar(solicitud.Cedula, 20)
             ?? throw new ErrorSolicitudException("La cédula es obligatoria y llegó vacía o sin resolver.");
@@ -105,6 +111,8 @@ public class ServicioEntregas(
             NombreTenedor = empleado.NombreCompleto,
             Cedula = empleado.Cedula,
             NombreAsociadoFirmante = nombreFirmante,
+            TipoDispositivo = dispositivo.TipoDispositivo,
+            Serial = dispositivo.Serial,
             Fabricante = dispositivo.Fabricante,
             Modelo = dispositivo.Modelo,
             Imei = dispositivo.IMEI,
@@ -210,8 +218,9 @@ public class ServicioEntregas(
                 e.Empleado.Cedula.Contains(termino) ||
                 e.Empleado.NombreCompleto.Contains(termino) ||
                 e.NombreAsociadoFirmante.Contains(termino) ||
-                e.Dispositivo.MobiControlDeviceId.Contains(termino) ||
-                (e.Dispositivo.IMEI != null && e.Dispositivo.IMEI.Contains(termino)));
+                (e.Dispositivo.MobiControlDeviceId != null && e.Dispositivo.MobiControlDeviceId.Contains(termino)) ||
+                (e.Dispositivo.IMEI != null && e.Dispositivo.IMEI.Contains(termino)) ||
+                (e.Dispositivo.Serial != null && e.Dispositivo.Serial.Contains(termino)));
         }
 
         if (desde is { } d) consulta = consulta.Where(e => e.FechaFirma >= d.ToDateTime(TimeOnly.MinValue));
@@ -236,7 +245,7 @@ public class ServicioEntregas(
                 e.EntregaId,
                 e.EmpresaId,
                 e.Empresa.Nombre,
-                e.Dispositivo.MobiControlDeviceId,
+                e.Dispositivo.MobiControlDeviceId ?? e.Dispositivo.IMEI ?? e.Dispositivo.Serial ?? "",
                 e.Dispositivo.Fabricante,
                 e.Dispositivo.Modelo,
                 e.Dispositivo.IMEI,
@@ -264,7 +273,7 @@ public class ServicioEntregas(
                 e.EntregaId,
                 e.EmpresaId,
                 e.Empresa.Nombre,
-                e.Dispositivo.MobiControlDeviceId,
+                e.Dispositivo.MobiControlDeviceId ?? e.Dispositivo.IMEI ?? e.Dispositivo.Serial ?? "",
                 e.Dispositivo.Fabricante,
                 e.Dispositivo.Modelo,
                 e.Dispositivo.IMEI,
@@ -325,7 +334,7 @@ public class ServicioEntregas(
     /// </summary>
     private async Task<(Empleado Empleado, Dispositivo Dispositivo, int? EstadoId, int? CanalId, int? DistritoId)>
         ResolverMaestrosAsync(
-            RegistrarEntregaRequest solicitud, string deviceId, string cedula, string nombreFirmante,
+            RegistrarEntregaRequest solicitud, string? deviceId, string cedula, string nombreFirmante,
             CancellationToken ct)
     {
         var ahora = DateTime.UtcNow;
@@ -357,8 +366,18 @@ public class ServicioEntregas(
         empleado.Canal = canal ?? empleado.Canal;
         empleado.Distrito = distrito ?? empleado.Distrito;
 
-        var dispositivo = await db.Dispositivos
-            .FirstOrDefaultAsync(d => d.MobiControlDeviceId == deviceId, ct);
+        var imei = TextoMobiControl.Normalizar(solicitud.Imei, 50);
+        var serial = TextoMobiControl.Normalizar(solicitud.Serial, 100);
+
+        // El mismo equipo puede llegar una vez con DeviceId (formulario del equipo) y otra solo con
+        // IMEI o serial (solicitud por enlace): se busca en ese orden para no duplicarlo.
+        Dispositivo? dispositivo = null;
+        if (deviceId is not null)
+            dispositivo = await db.Dispositivos.FirstOrDefaultAsync(d => d.MobiControlDeviceId == deviceId, ct);
+        if (dispositivo is null && imei is not null)
+            dispositivo = await db.Dispositivos.FirstOrDefaultAsync(d => d.IMEI == imei, ct);
+        if (dispositivo is null && serial is not null)
+            dispositivo = await db.Dispositivos.FirstOrDefaultAsync(d => d.Serial == serial, ct);
 
         if (dispositivo is null)
         {
@@ -373,7 +392,14 @@ public class ServicioEntregas(
         else
         {
             dispositivo.FechaActualizacion = ahora;
+
+            // Un equipo que se reinscribió en MobiControl cambia de DeviceId, y uno que antes llegó
+            // sin él puede traerlo ahora: el último conocido es el que sirve para sincronizar.
+            if (deviceId is not null) dispositivo.MobiControlDeviceId = deviceId;
         }
+
+        dispositivo.TipoDispositivo = TextoMobiControl.Normalizar(solicitud.TipoDispositivo, 30) ?? dispositivo.TipoDispositivo;
+        dispositivo.Serial = serial ?? dispositivo.Serial;
 
         // Los datos del equipo se refrescan con lo que reporta MobiControl, pero solo cuando
         // llegan: un atributo que no se resolvió no debe borrar lo que ya se sabía del equipo.
@@ -453,6 +479,14 @@ public class ServicioEntregas(
                 .Where(d => d.DispositivoId == entrega.DispositivoId)
                 .Select(d => d.MobiControlDeviceId)
                 .FirstAsync(ct);
+
+        // Un equipo fuera de MobiControl (un PC sin agente, por ejemplo) no tiene nada que marcar:
+        // el acta queda firmada y no se intenta una llamada que va a fallar.
+        if (deviceId is null)
+        {
+            logger.LogInformation("El acta {Uid} es de un equipo sin DeviceId de MobiControl; no se sincroniza.", entrega.EntregaUid);
+            return [];
+        }
 
         var fecha = entrega.FechaEntregaProgramada ?? DateOnly.FromDateTime(entrega.FechaFirma.AddDays(1));
 

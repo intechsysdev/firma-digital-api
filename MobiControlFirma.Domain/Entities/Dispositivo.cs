@@ -1,9 +1,10 @@
 namespace MobiControlFirma.Domain.Entities;
 
 /// <summary>
-/// Equipo administrado en MobiControl. La identidad es <see cref="MobiControlDeviceId"/>
-/// (el <c>%deviceid%</c> del formulario): el IMEI puede venir vacío en equipos que aún no
-/// reportan y no sirve como llave.
+/// Equipo entregado. Si está en MobiControl, su identidad es <see cref="MobiControlDeviceId"/>
+/// (el <c>%deviceid%</c> del formulario). Las solicitudes por enlace pueden traer solo el IMEI o
+/// el serial —un PC, por ejemplo, puede no estar en la consola—, y entonces el equipo se reconoce
+/// por esos datos y el acta se firma sin marcarlo en MobiControl.
 /// </summary>
 public class Dispositivo : IDeEmpresa
 {
@@ -12,7 +13,14 @@ public class Dispositivo : IDeEmpresa
     /// <summary>Empresa dueña del registro. El contexto filtra por aquí en cada consulta.</summary>
     public int EmpresaId { get; set; }
     public Empresa Empresa { get; set; } = null!;
-    public string MobiControlDeviceId { get; set; } = string.Empty;
+    /// <summary>Null si el equipo no está (o todavía no se encontró) en MobiControl.</summary>
+    public string? MobiControlDeviceId { get; set; }
+
+    /// <summary>Celular, Tableta, PC… Texto libre: el proceso puede sumar tipos de equipo.</summary>
+    public string? TipoDispositivo { get; set; }
+
+    /// <summary>Serial del fabricante. Identifica equipos sin IMEI, como un PC.</summary>
+    public string? Serial { get; set; }
 
     public string? Fabricante { get; set; }
     public string? Modelo { get; set; }

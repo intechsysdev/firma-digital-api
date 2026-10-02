@@ -218,6 +218,8 @@ public class ServicioCallbacks(
             equipo = new
             {
                 deviceId = entrega.Dispositivo.MobiControlDeviceId,
+                tipoDispositivo = entrega.Dispositivo.TipoDispositivo,
+                serial = entrega.Dispositivo.Serial,
                 fabricante = entrega.Dispositivo.Fabricante,
                 modelo = entrega.Dispositivo.Modelo,
                 imei = entrega.Dispositivo.IMEI,

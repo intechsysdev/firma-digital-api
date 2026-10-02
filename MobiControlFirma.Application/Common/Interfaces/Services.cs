@@ -79,7 +79,8 @@ public record EquipoMobiControl(
     DateTimeOffset? UltimoReporte,
     string? Grupo,
     string? Imei,
-    string? Telefono)
+    string? Telefono,
+    string? Serial)
 {
     /// <summary>Solo teléfonos y tabletas reportan posición: pedirla a un Mac o a un PC es una llamada perdida.</summary>
     public bool TieneGps => Plataforma is "Android" or "iOS";

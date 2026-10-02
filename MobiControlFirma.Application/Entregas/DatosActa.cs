@@ -11,6 +11,8 @@ public record DatosActa
     public required string Cedula { get; init; }
     public required string NombreAsociadoFirmante { get; init; }
 
+    public string? TipoDispositivo { get; init; }
+    public string? Serial { get; init; }
     public string? Fabricante { get; init; }
     public string? Modelo { get; init; }
     public string? Imei { get; init; }

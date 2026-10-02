@@ -166,10 +166,12 @@ public class ServicioGeolocalizacion(
     /// </summary>
     private async Task<Dictionary<string, ActaEquipo>> UltimaActaPorEquipoAsync(CancellationToken ct)
     {
+        // Solo los equipos con DeviceId: los demás no están en la consola y no hay posición que pedir.
         var filas = await db.Entregas.AsNoTracking()
+            .Where(e => e.Dispositivo.MobiControlDeviceId != null)
             .OrderByDescending(e => e.FechaFirma)
             .Select(e => new ActaEquipo(
-                e.Dispositivo.MobiControlDeviceId,
+                e.Dispositivo.MobiControlDeviceId!,
                 e.Dispositivo.Fabricante,
                 e.Dispositivo.Modelo,
                 e.Dispositivo.IMEI,

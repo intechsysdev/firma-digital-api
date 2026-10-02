@@ -17,6 +17,12 @@ public class DatosActaEditables
     /// <summary>A esta dirección van el enlace y la copia del acta.</summary>
     [MaxLength(200)] public string? Correo { get; set; }
 
+    /// <summary>Celular, Tableta, PC… Texto libre.</summary>
+    [MaxLength(30)]  public string? TipoDispositivo { get; set; }
+
+    /// <summary>Serial del fabricante. Identifica equipos sin IMEI.</summary>
+    [MaxLength(100)] public string? Serial { get; set; }
+
     [MaxLength(100)] public string? Fabricante { get; set; }
     [MaxLength(100)] public string? Modelo { get; set; }
     [MaxLength(50)]  public string? Imei { get; set; }
@@ -35,19 +41,25 @@ public class DatosActaEditables
 }
 
 /// <summary>
-/// Lo que manda el sistema de origen para pedir una firma. El identificador del equipo no es
-/// editable después: es la identidad del dispositivo en MobiControl, y cambiarlo haría que el
+/// Lo que manda el sistema de origen para pedir una firma. El identificador del equipo en
+/// MobiControl no es editable después: es con el que se marca la entrega, y cambiarlo haría que el
 /// acta marcara como entregado a otro equipo.
 /// </summary>
 public class CrearSolicitudRequest : DatosActaEditables
 {
-    /// <summary>Identificador de la solicitud en el sistema de origen.</summary>
+    /// <summary>
+    /// Identificador de la solicitud en el sistema de origen (en HV, el ID de SharePoint). Es la
+    /// llave de la integración: vuelve tal cual en la consulta y en el callback.
+    /// </summary>
     [Required, MaxLength(100)]
     public string IdSolicitud { get; set; } = string.Empty;
 
-    /// <summary>Equivale a <c>%deviceid%</c>.</summary>
-    [Required, MaxLength(100)]
-    public string DeviceId { get; set; } = string.Empty;
+    /// <summary>
+    /// Equivale a <c>%deviceid%</c>. Opcional: si no llega, se busca el equipo en MobiControl por
+    /// IMEI o serial al firmar; si no está en la consola, el acta se firma sin marcarlo.
+    /// </summary>
+    [MaxLength(100)]
+    public string? DeviceId { get; set; }
 
     /// <summary>Días que el enlace acepta firmas. Por defecto, siete.</summary>
     [Range(1, 90)]
@@ -68,7 +80,7 @@ public class FirmarSolicitudRequest : DatosActaEditables
 
 /// <summary>Datos precargados tal como quedaron guardados, ya normalizados.</summary>
 public record DatosSolicitud(
-    string DeviceId,
+    string? DeviceId,
     string Cedula,
     string? Usuario,
     string? Correo,
@@ -82,7 +94,9 @@ public record DatosSolicitud(
     string? Distrito,
     string? Costo,
     string? Entregables,
-    string? CiudadFirma);
+    string? CiudadFirma,
+    string? TipoDispositivo = null,
+    string? Serial = null);
 
 /// <param name="Duplicada">True cuando el origen ya había pedido esta misma solicitud.</param>
 /// <param name="UrlFirma">Enlace para firmar. Cada respuesta trae uno nuevo y todos siguen sirviendo.</param>

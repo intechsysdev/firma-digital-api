@@ -9,9 +9,18 @@ namespace MobiControlFirma.Application.Entregas;
 /// </summary>
 public class RegistrarEntregaRequest
 {
-    /// <summary>Valor de <c>%deviceid%</c>. Es la identidad del equipo en MobiControl.</summary>
-    [Required, MaxLength(100)]
-    public string DeviceId { get; set; } = string.Empty;
+    /// <summary>
+    /// Valor de <c>%deviceid%</c>, la identidad del equipo en MobiControl. El formulario del equipo
+    /// siempre lo envía; una solicitud por enlace puede traer solo el IMEI o el serial.
+    /// </summary>
+    [MaxLength(100)]
+    public string? DeviceId { get; set; }
+
+    /// <summary>Celular, Tableta, PC…</summary>
+    [MaxLength(30)] public string? TipoDispositivo { get; set; }
+
+    /// <summary>Serial del fabricante, para equipos sin IMEI.</summary>
+    [MaxLength(100)] public string? Serial { get; set; }
 
     [Required, MaxLength(20)]
     public string Cedula { get; set; } = string.Empty;

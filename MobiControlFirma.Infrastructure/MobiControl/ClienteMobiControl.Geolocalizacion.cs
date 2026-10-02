@@ -51,7 +51,8 @@ public partial class ClienteMobiControl
                     Fecha(equipo, "LastCheckInTime") ?? Fecha(equipo, "LastAgentConnectTime"),
                     Texto(equipo, "Path"),
                     Texto(equipo, "IMEI_MEID_ESN"),
-                    Texto(equipo, "PhoneNumber")));
+                    Texto(equipo, "PhoneNumber"),
+                    Texto(equipo, "HardwareSerialNumber")));
             }
 
             if (json.RootElement.GetArrayLength() < TamanoPagina) break;
