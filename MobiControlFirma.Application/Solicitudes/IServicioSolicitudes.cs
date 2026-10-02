@@ -14,6 +14,29 @@ public interface IServicioSolicitudes
     /// <summary>Null si la empresa no tiene una solicitud con ese identificador de origen.</summary>
     Task<SolicitudDto?> ConsultarAsync(string idSolicitud, CancellationToken ct = default);
 
+    /// <summary>
+    /// Solicitudes que cambiaron desde una fecha, de la más vieja a la más nueva. Es como el origen
+    /// se entera de las firmas cuando no recibe avisos.
+    /// </summary>
+    Task<PaginaDto<SolicitudResumenDto>> ListarAsync(
+        DateTimeOffset? desde, string? estado, int pagina, int tamanoPagina, CancellationToken ct = default);
+
+    /// <summary>
+    /// Solicitud pendiente de un equipo, por IMEI o serial: lo que el formulario del equipo usa
+    /// para completar lo que MobiControl no tiene. Null si el origen no ha mandado ninguna.
+    /// </summary>
+    Task<PrecargaEquipoDto?> BuscarPrecargaAsync(string? imei, string? serial, CancellationToken ct = default);
+
+    /// <summary>
+    /// Registra el acta firmada en el equipo y la ata a la solicitud de la que salieron sus datos.
+    /// El acta se registra aunque la solicitud ya no esté pendiente; solo que entonces no se ata.
+    /// </summary>
+    Task<EntregaCreadaResponse> RegistrarDesdeEquipoAsync(
+        RegistrarEntregaRequest acta, string? ipOrigen, string? userAgent, CancellationToken ct = default);
+
+    /// <summary>PDF del acta de una solicitud, por el identificador del origen. Null si no está firmada.</summary>
+    Task<ArchivoDescargado?> DescargarPdfPorOrigenAsync(string idSolicitud, CancellationToken ct = default);
+
     /// <summary>Vuelve a poner en cola el aviso al origen, reiniciando los intentos.</summary>
     Task<SolicitudDto> ReintentarCallbackAsync(string idSolicitud, CancellationToken ct = default);
 

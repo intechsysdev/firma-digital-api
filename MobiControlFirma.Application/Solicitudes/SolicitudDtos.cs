@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using MobiControlFirma.Application.Common;
+using MobiControlFirma.Domain.Entities;
 
 namespace MobiControlFirma.Application.Solicitudes;
 
@@ -118,22 +119,112 @@ public record SolicitudCreadaResponse(
     DateTime FechaVencimiento,
     bool Duplicada);
 
-/// <summary>Estado de una solicitud, para que el origen pueda consultarla sin esperar el callback.</summary>
+/// <summary>
+/// Todo lo de una solicitud: lo que mandó el origen, en qué va y, si se firmó, el acta tal como
+/// quedó. Es lo que el origen consulta cuando no recibe avisos.
+/// </summary>
+/// <param name="Datos">Lo que mandó el origen, ya normalizado.</param>
+/// <param name="Acta">Lo que se firmó, con las correcciones que se hayan hecho al firmar. Null si no se ha firmado.</param>
+/// <param name="UrlDocumento">Descarga del PDF sin credenciales. Null si no se ha firmado.</param>
 public record SolicitudDto(
-    Guid SolicitudUid,
     string IdSolicitud,
+    Guid SolicitudUid,
     string Estado,
     DateTime FechaCreacion,
+    DateTime FechaActualizacion,
     DateTime FechaVencimiento,
     DateTime? FechaFirma,
+    DateTime? FechaRechazo,
+    string? MotivoRechazo,
+    string? RechazadoPor,
+    string? UrlDocumento,
+    DatosSolicitud Datos,
+    ActaFirmadaDto? Acta,
     Guid? EntregaUid,
     string? EstadoCallback,
     int IntentosCallback,
     int? CodigoHttpCallback,
     string? UltimoErrorCallback,
-    DateTime? FechaCallback,
-    DateTime? FechaRechazo = null,
-    string? MotivoRechazo = null);
+    DateTime? FechaCallback);
+
+/// <summary>Fila del listado de solicitudes: lo justo para saber cuáles consultar.</summary>
+public record SolicitudResumenDto(
+    string IdSolicitud,
+    string Estado,
+    DateTime FechaCreacion,
+    DateTime FechaActualizacion,
+    DateTime? FechaFirma,
+    DateTime? FechaRechazo);
+
+/// <summary>
+/// Lo que el formulario del equipo recibe al buscar su solicitud por IMEI o serial: los datos que
+/// MobiControl no tiene y el identificador con el que el acta queda atada a la solicitud.
+/// </summary>
+public record PrecargaEquipoDto(
+    string IdSolicitud,
+    Guid SolicitudUid,
+    DateTime FechaVencimiento,
+    DatosSolicitud Datos);
+
+/// <summary>El acta que resultó de una solicitud, con los datos que se firmaron.</summary>
+public record ActaFirmadaDto(
+    Guid EntregaUid,
+    string Numero,
+    DateTime FechaFirma,
+    string? CiudadFirma,
+    DateOnly? FechaEntrega,
+    string EstadoProceso,
+    FirmanteActaDto Firmante,
+    EquipoActaDto Equipo)
+{
+    /// <summary>Requiere la entrega con su empleado, dispositivo, estado, canal y distrito.</summary>
+    public static ActaFirmadaDto Desde(EntregaDispositivo entrega) => new(
+        entrega.EntregaUid,
+        entrega.EntregaUid.ToString()[..8].ToUpperInvariant(),
+        // La base guarda UTC pero lo devuelve sin marcar; sin la Z se leería como hora local.
+        DateTime.SpecifyKind(entrega.FechaFirma, DateTimeKind.Utc),
+        entrega.CiudadFirma,
+        entrega.FechaEntregaProgramada,
+        entrega.EstadoProceso.ToString(),
+        new FirmanteActaDto(
+            entrega.NombreAsociadoFirmante,
+            entrega.Empleado.NombreCompleto,
+            entrega.Empleado.Cedula,
+            entrega.CorreoAsociado),
+        new EquipoActaDto(
+            entrega.Dispositivo.MobiControlDeviceId,
+            entrega.Dispositivo.TipoDispositivo,
+            entrega.Dispositivo.Serial,
+            entrega.Dispositivo.Fabricante,
+            entrega.Dispositivo.Modelo,
+            entrega.Dispositivo.IMEI,
+            entrega.ICCID,
+            entrega.NumeroCelular,
+            entrega.Estado?.Nombre,
+            entrega.Canal?.Nombre,
+            entrega.Distrito?.Nombre,
+            entrega.CostoEquipo,
+            entrega.Entregables));
+}
+
+/// <param name="Nombre">Quien firmó, tal como lo confirmó.</param>
+/// <param name="NombreTenedor">El responsable registrado del equipo.</param>
+public record FirmanteActaDto(string Nombre, string NombreTenedor, string Cedula, string? Correo);
+
+public record EquipoActaDto(
+    string? DeviceId,
+    string? TipoDispositivo,
+    string? Serial,
+    string? Fabricante,
+    string? Modelo,
+    string? Imei,
+    string? Iccid,
+    string? NumeroCelular,
+    string? Estado,
+    string? Canal,
+    string? Distrito,
+    decimal? Costo,
+    string? Entregables);
 
 /// <summary>Lo que el formulario web necesita para pintarse.</summary>
 public record FormularioFirmaDto(

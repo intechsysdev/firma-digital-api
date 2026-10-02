@@ -971,17 +971,21 @@
 
             // Campos que se muestran en la tarjeta del equipo, todos de solo lectura.
             // "mono" los pinta en tipografía monoespaciada (números largos que se leen mejor
-            // dígito a dígito) y "moneda" les da formato de pesos.
+            // dígito a dígito) y "moneda" les da formato de pesos. Los "opcional" solo los trae
+            // la solicitud del sistema de origen: si no hay, no se muestran ni se reclaman.
             var CAMPOS = [
+                { clave: "tipoDispositivo", etiqueta: "Tipo de equipo", opcional: true },
                 { clave: "fabricante", etiqueta: "Marca" },
                 { clave: "modelo", etiqueta: "Modelo" },
                 { clave: "imei", etiqueta: "IMEI", mono: true },
+                { clave: "serial", etiqueta: "Serial", mono: true, opcional: true },
                 { clave: "iccid", etiqueta: "SIMCARD (ICCID)", mono: true },
                 { clave: "numeroCelular", etiqueta: "No. celular" },
                 { clave: "estado", etiqueta: "Estado" },
                 { clave: "canal", etiqueta: "Canal" },
                 { clave: "distrito", etiqueta: "Distrito" },
-                { clave: "costo", etiqueta: "Costo del equipo", moneda: true }
+                { clave: "costo", etiqueta: "Costo del equipo", moneda: true },
+                { clave: "fechaEntrega", etiqueta: "Fecha de entrega", fecha: true, opcional: true }
             ];
 
             var $ = function (id) { return document.getElementById(id); };
@@ -1003,8 +1007,26 @@
                 return v === "N/A" || v === "n/a" || v === "null" || v === "-";
             }
 
+            /**
+             * Lo que MobiControl resolvió y, si no lo tiene, lo que mandó el sistema de origen en
+             * la solicitud del equipo. MobiControl manda primero: es el inventario real. El
+             * identificador del equipo sale solo de MobiControl, porque es con el que se marca.
+             */
             function valor(clave) {
-                return sinResolver(VARIABLES[clave]) ? "" : String(VARIABLES[clave]).trim();
+                if (!sinResolver(VARIABLES[clave])) return String(VARIABLES[clave]).trim();
+                if (clave === "deviceId" || !precarga) return "";
+                var dato = precarga.datos[clave];
+                return dato === null || dato === undefined ? "" : String(dato).trim();
+            }
+
+            /** "2026-10-05" como fecha local, sin que la zona horaria la corra un día. */
+            function fechaIso(texto) {
+                var partes = /^(\d{4})-(\d{2})-(\d{2})/.exec(texto);
+                return partes ? new Date(Number(partes[1]), Number(partes[2]) - 1, Number(partes[3])) : null;
+            }
+
+            function ciudad() {
+                return (precarga && precarga.datos.ciudadFirma) || CONFIG.ciudad;
             }
 
             function formatearMoneda(texto) {
@@ -1192,6 +1214,7 @@
             var enviando = false;
             var claveIdempotencia = null;
             var ultimaRespuesta = null;
+            var precarga = null;      // solicitud del sistema de origen para este equipo, si la hay
 
             function apiKey() {
                 return sinResolver(CONFIG.apiKeyAtributo) ? "" : CONFIG.apiKeyAtributo.trim();
@@ -1213,7 +1236,7 @@
             function pintar() {
                 var hoy = new Date();
                 $("txt-fecha").textContent = fechaLarga(hoy);
-                $("txt-ciudad").textContent = CONFIG.ciudad;
+                $("txt-ciudad").textContent = ciudad();
                 $("txt-usuario").textContent = valor("usuario") || "—";
                 $("txt-cedula").textContent = valor("cedula") || "—";
 
@@ -1222,6 +1245,9 @@
 
                 var rejilla = $("rejilla-datos");
                 CAMPOS.forEach(function (campo) {
+                    var texto = valor(campo.clave);
+                    if (campo.opcional && !texto) return;
+
                     var celda = document.createElement("div");
                     celda.className = "dato";
 
@@ -1230,12 +1256,12 @@
                     etiqueta.textContent = campo.etiqueta;
                     celda.appendChild(etiqueta);
 
-                    var texto = valor(campo.clave);
-
                     if (texto) {
                         var span = document.createElement("span");
                         span.className = "dato-valor" + (campo.mono ? " mono" : "");
-                        span.textContent = campo.moneda ? formatearMoneda(texto) : texto;
+                        span.textContent = campo.moneda ? formatearMoneda(texto)
+                            : campo.fecha && fechaIso(texto) ? fechaLarga(fechaIso(texto))
+                            : texto;
                         celda.appendChild(span);
                     } else {
                         // Ni siquiera cuando el dato falta se abre a edición: el acta describe
@@ -1264,6 +1290,11 @@
             }
 
             function revisarAvisos() {
+                if (precarga) {
+                    mostrarAviso("info", "Solicitud " + precarga.idSolicitud + ". ",
+                        "Los datos que MobiControl no tenía se completaron con la solicitud de entrega de este equipo.");
+                }
+
                 if (!valor("deviceId")) {
                     mostrarAviso("error", "No se pudo identificar el equipo. ",
                         "MobiControl no envió el identificador del dispositivo, así que el acta no se puede " +
@@ -1289,6 +1320,33 @@
                     mostrarAviso("alerta", "Falta la cédula. ",
                         "El acta necesita la cédula del asociado. Comunícate con TI para cargarla en MobiControl.");
                 }
+            }
+
+            /**
+             * Busca por IMEI la solicitud que el sistema de origen mandó para este equipo (en HV,
+             * el registro de SharePoint) con los datos que MobiControl no tiene. Sin red o sin
+             * solicitud se sigue con lo de MobiControl: esto completa el acta, no la habilita.
+             */
+            function buscarPrecarga() {
+                var imei = valor("imei");
+                if (!imei || !apiKey()) return Promise.resolve();
+
+                // Sin respuesta en unos segundos no se hace esperar al asociado.
+                var control = typeof AbortController !== "undefined" ? new AbortController() : null;
+                var temporizador = control ? setTimeout(function () { control.abort(); }, 8000) : null;
+
+                return fetch(url("/api/v1/solicitudes/pendiente?imei=" + encodeURIComponent(imei)), {
+                    headers: { "X-Api-Key": apiKey() },
+                    signal: control ? control.signal : undefined
+                }).then(function (respuesta) {
+                    return respuesta.ok ? respuesta.json() : null;
+                }).then(function (datos) {
+                    if (datos && datos.idSolicitud && datos.datos) precarga = datos;
+                }).catch(function () {
+                    // Sin conexión: el acta sale con lo que resolvió MobiControl.
+                }).then(function () {
+                    if (temporizador) clearTimeout(temporizador);
+                });
             }
 
             /** Avisa si el equipo ya tiene un acta firmada, para no duplicar la entrega. */
@@ -1336,7 +1394,13 @@
                     distrito: dato("distrito"),
                     costo: dato("costo"),
                     entregables: valor("entregables"),
-                    ciudadFirma: CONFIG.ciudad,
+                    tipoDispositivo: valor("tipoDispositivo"),
+                    serial: valor("serial"),
+                    // Null y no "": el API la espera como fecha.
+                    fechaEntregaProgramada: valor("fechaEntrega") || null,
+                    ciudadFirma: ciudad(),
+                    // Ata el acta a la solicitud del origen, que la ve al consultarla.
+                    idSolicitud: precarga ? precarga.idSolicitud : null,
                     firmaBase64: tablero.aPng(),
                     claveIdempotencia: claveIdempotencia,
                     // Sin sincronizar todavía. Marcar el atributo en MobiControl cierra este
@@ -1581,8 +1645,6 @@
             }
 
             function iniciar() {
-                pintar();
-
                 tablero = TableroFirma($("lienzo-firma"), function () {
                     $("marco-firma").classList.toggle("firmado", !tablero.estaVacia());
                     actualizarBotonEnviar();
@@ -1613,8 +1675,15 @@
                 reintentarPendiente();
                 window.addEventListener("online", reintentarPendiente);
 
-                revisarAvisos();
-                consultarEstadoPrevio();
+                // La pantalla se pinta cuando se sabe si hay solicitud del origen, para no mostrar
+                // "Sin registrar" en datos que llegan un segundo después.
+                buscarPrecarga().then(function () {
+                    pintar();
+                    tablero.ajustar();
+                    revisarAvisos();
+                    consultarEstadoPrevio();
+                    actualizarBotonEnviar();
+                });
             }
 
             if (document.readyState === "loading") {

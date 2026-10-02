@@ -55,18 +55,6 @@ public class ServicioSolicitudes(
         var cedula = TextoMobiControl.Normalizar(solicitud.Cedula, 20)
             ?? throw new ErrorSolicitudException("Falta la cédula del asociado.");
 
-        var existente = await db.Solicitudes
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.IdSolicitudOrigen == idOrigen, ct);
-
-        if (existente is not null)
-        {
-            logger.LogInformation(
-                "El origen volvió a pedir la solicitud {Origen}; se devuelve la existente {Uid}.",
-                idOrigen, existente.SolicitudUid);
-            return Creada(existente, duplicada: true);
-        }
-
         // La ciudad del acta es de la empresa, no del equipo: si el origen no la manda se toma
         // la que la empresa tiene en One, que es la misma que usaría el formulario del equipo.
         var ciudad = TextoMobiControl.Normalizar(solicitud.CiudadFirma, 100)
@@ -93,6 +81,29 @@ public class ServicioSolicitudes(
             FechaEntrega: solicitud.FechaEntrega);
 
         var ahora = DateTime.UtcNow;
+        var vence = ahora.AddDays(solicitud.VigenciaDias ?? VigenciaPorDefectoDias);
+
+        var existente = await db.Solicitudes.FirstOrDefaultAsync(s => s.IdSolicitudOrigen == idOrigen, ct);
+
+        if (existente is not null)
+        {
+            // Mientras nadie la firme, reenviarla es corregirla: el origen arregla un dato en su
+            // sistema y lo vuelve a mandar, y el equipo o el enlace muestran ya lo corregido.
+            // Firmada o rechazada ya no cambia: el acta dice lo que se firmó.
+            if (existente.Estado == EstadoSolicitud.PENDIENTE)
+            {
+                existente.DatosOrigen = JsonSerializer.Serialize(datos, Json);
+                existente.Imei = ClaveEquipo(imei, 50);
+                existente.Serial = ClaveEquipo(serial, 100);
+                existente.FechaVencimiento = vence;
+                existente.FechaActualizacion = ahora;
+                await db.SaveChangesAsync(ct);
+
+                logger.LogInformation("El origen reenvió la solicitud {Origen}; se actualizaron sus datos.", idOrigen);
+            }
+
+            return Creada(existente, duplicada: true);
+        }
 
         var nueva = new SolicitudFirma
         {
@@ -100,9 +111,12 @@ public class ServicioSolicitudes(
             SolicitudUid = Guid.NewGuid(),
             IdSolicitudOrigen = idOrigen,
             DatosOrigen = JsonSerializer.Serialize(datos, Json),
+            Imei = ClaveEquipo(imei, 50),
+            Serial = ClaveEquipo(serial, 100),
             Estado = EstadoSolicitud.PENDIENTE,
             FechaCreacion = ahora,
-            FechaVencimiento = ahora.AddDays(solicitud.VigenciaDias ?? VigenciaPorDefectoDias),
+            FechaActualizacion = ahora,
+            FechaVencimiento = vence,
         };
 
         db.Solicitudes.Add(nueva);
@@ -115,13 +129,132 @@ public class ServicioSolicitudes(
 
     public async Task<SolicitudDto?> ConsultarAsync(string idSolicitud, CancellationToken ct = default)
     {
-        var solicitud = await BuscarPorOrigenAsync(idSolicitud, ct);
+        var solicitud = await BuscarCompletaAsync(idSolicitud, ct);
         return solicitud is null ? null : AVista(solicitud);
+    }
+
+    public async Task<PaginaDto<SolicitudResumenDto>> ListarAsync(
+        DateTimeOffset? desde, string? estado, int pagina, int tamanoPagina, CancellationToken ct = default)
+    {
+        pagina = Math.Max(pagina, 1);
+        tamanoPagina = Math.Clamp(tamanoPagina, 1, 200);
+
+        var ahora = DateTime.UtcNow;
+        var consulta = db.Solicitudes.AsNoTracking();
+
+        if (desde is { } d)
+        {
+            var desdeUtc = d.UtcDateTime;
+            consulta = consulta.Where(s => s.FechaActualizacion >= desdeUtc);
+        }
+
+        // VENCIDA no se guarda: es una pendiente a la que se le pasó la fecha.
+        consulta = estado?.Trim().ToUpperInvariant() switch
+        {
+            null or "" => consulta,
+            EstadoVencida => consulta.Where(s => s.Estado == EstadoSolicitud.PENDIENTE && s.FechaVencimiento <= ahora),
+            "PENDIENTE" => consulta.Where(s => s.Estado == EstadoSolicitud.PENDIENTE && s.FechaVencimiento > ahora),
+            var otro when Enum.TryParse<EstadoSolicitud>(otro, out var e) => consulta.Where(s => s.Estado == e),
+            _ => throw new ErrorSolicitudException("Estado inválido: use PENDIENTE, FIRMADA, RECHAZADA o VENCIDA."),
+        };
+
+        var total = await consulta.CountAsync(ct);
+
+        // Del cambio más viejo al más nuevo: quien sincroniza guarda la fecha del último que
+        // procesó y la manda como "desde" en la siguiente vuelta.
+        var filas = await consulta
+            .OrderBy(s => s.FechaActualizacion).ThenBy(s => s.SolicitudId)
+            .Skip((pagina - 1) * tamanoPagina)
+            .Take(tamanoPagina)
+            .ToListAsync(ct);
+
+        var items = filas
+            .Select(s => new SolicitudResumenDto(
+                s.IdSolicitudOrigen, EstadoVisible(s), Utc(s.FechaCreacion), Utc(s.FechaActualizacion),
+                Utc(s.FechaFirma), Utc(s.FechaRechazo)))
+            .ToList();
+
+        return new PaginaDto<SolicitudResumenDto>(items, total, pagina, tamanoPagina);
+    }
+
+    public async Task<PrecargaEquipoDto?> BuscarPrecargaAsync(string? imei, string? serial, CancellationToken ct = default)
+    {
+        var claveImei = ClaveEquipo(imei, 50);
+        var claveSerial = ClaveEquipo(serial, 100);
+
+        if (claveImei is null && claveSerial is null)
+            throw new ErrorSolicitudException("Envíe el IMEI o el serial del equipo.");
+
+        var ahora = DateTime.UtcNow;
+
+        // Si el origen pidió dos actas para el mismo equipo, gana la más reciente: es la de la
+        // entrega que está por hacerse.
+        var solicitud = await db.Solicitudes
+            .AsNoTracking()
+            .Where(s => s.Estado == EstadoSolicitud.PENDIENTE && s.FechaVencimiento > ahora)
+            .Where(s => (claveImei != null && s.Imei == claveImei) || (claveSerial != null && s.Serial == claveSerial))
+            .OrderByDescending(s => s.FechaActualizacion)
+            .FirstOrDefaultAsync(ct);
+
+        return solicitud is null
+            ? null
+            : new PrecargaEquipoDto(solicitud.IdSolicitudOrigen, solicitud.SolicitudUid, Utc(solicitud.FechaVencimiento), LeerDatos(solicitud));
+    }
+
+    public async Task<EntregaCreadaResponse> RegistrarDesdeEquipoAsync(
+        RegistrarEntregaRequest acta, string? ipOrigen, string? userAgent, CancellationToken ct = default)
+    {
+        var solicitud = await BuscarPorOrigenAsync(acta.IdSolicitud ?? string.Empty, ct);
+
+        // La fecha de entrega es del origen: el formulario la trae de la precarga, pero si no la
+        // mandó (un acta que esperaba en la cola del equipo) se toma de la solicitud.
+        if (solicitud is not null)
+            acta.FechaEntregaProgramada ??= LeerDatos(solicitud).FechaEntrega;
+
+        // El acta se registra pase lo que pase con la solicitud: la firma ya se hizo en el equipo
+        // y perderla por un problema de la solicitud sería peor que un acta sin atar.
+        var registro = await entregas.RegistrarAsync(acta, ipOrigen, userAgent, ct);
+
+        if (solicitud is null)
+        {
+            logger.LogWarning("El equipo firmó con la solicitud {Origen}, que no existe; el acta {Acta} queda sin atar.",
+                acta.IdSolicitud, registro.EntregaUid);
+            return registro;
+        }
+
+        if (solicitud.Estado == EstadoSolicitud.PENDIENTE)
+        {
+            solicitud.Estado = EstadoSolicitud.FIRMADA;
+            solicitud.EntregaId = registro.EntregaId;
+            solicitud.FechaFirma = registro.FechaFirma;
+            solicitud.FechaActualizacion = DateTime.UtcNow;
+            solicitud.EstadoCallback = EstadoCallback.PENDIENTE;
+            solicitud.ProximoIntentoCallback = null;
+
+            await db.SaveChangesAsync(ct);
+
+            logger.LogInformation("Solicitud {Origen} firmada desde el equipo; acta {Acta}.",
+                solicitud.IdSolicitudOrigen, registro.EntregaUid);
+        }
+        else if (solicitud.EntregaId != registro.EntregaId)
+        {
+            logger.LogWarning(
+                "El equipo firmó la solicitud {Origen}, que ya estaba {Estado}; el acta {Acta} queda sin atar.",
+                solicitud.IdSolicitudOrigen, solicitud.Estado, registro.EntregaUid);
+        }
+
+        return registro;
+    }
+
+    public async Task<ArchivoDescargado?> DescargarPdfPorOrigenAsync(string idSolicitud, CancellationToken ct = default)
+    {
+        var solicitud = await BuscarPorOrigenAsync(idSolicitud, ct);
+        return solicitud?.Entrega is { } entrega ? await entregas.DescargarPdfAsync(entrega.EntregaUid, ct) : null;
     }
 
     public async Task<SolicitudDto> ReintentarCallbackAsync(string idSolicitud, CancellationToken ct = default)
     {
-        var solicitud = await BuscarPorOrigenAsync(idSolicitud, ct)
+        var solicitud = await BuscarCompletaAsync(idSolicitud, ct)
             ?? throw new ErrorSolicitudException("No existe una solicitud con ese identificador.");
 
         if (solicitud.Estado == EstadoSolicitud.PENDIENTE)
@@ -220,6 +353,7 @@ public class ServicioSolicitudes(
         solicitud.Estado = EstadoSolicitud.FIRMADA;
         solicitud.EntregaId = registro.EntregaId;
         solicitud.FechaFirma = registro.FechaFirma;
+        solicitud.FechaActualizacion = DateTime.UtcNow;
         solicitud.EstadoCallback = EstadoCallback.PENDIENTE;
         solicitud.ProximoIntentoCallback = null;
 
@@ -257,6 +391,7 @@ public class ServicioSolicitudes(
         solicitud.FechaRechazo = DateTime.UtcNow;
         solicitud.MotivoRechazo = motivo;
         solicitud.RechazadoPor = TextoMobiControl.Normalizar(rechazo.Nombre, 200);
+        solicitud.FechaActualizacion = solicitud.FechaRechazo.Value;
         solicitud.EstadoCallback = EstadoCallback.PENDIENTE;
         solicitud.ProximoIntentoCallback = null;
 
@@ -308,6 +443,34 @@ public class ServicioSolicitudes(
         }
     }
 
+    /// <summary>
+    /// IMEI o serial reducidos a letras y dígitos, que es como se guardan y se buscan: el origen
+    /// los escribe "35 678901 234567 8" o "R58M-1234" y MobiControl los reporta sin separadores.
+    /// </summary>
+    private static string? ClaveEquipo(string? valor, int maximo)
+    {
+        var limpio = TextoMobiControl.Normalizar(valor);
+        if (limpio is null) return null;
+
+        var clave = new string(limpio.Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant();
+        return clave.Length == 0 ? null : clave.Length <= maximo ? clave : clave[..maximo];
+    }
+
+    /// <summary>La solicitud con el acta y todo lo que hace falta para mostrarla.</summary>
+    private async Task<SolicitudFirma?> BuscarCompletaAsync(string idSolicitud, CancellationToken ct)
+    {
+        var idOrigen = TextoMobiControl.Normalizar(idSolicitud, 100)
+            ?? throw new ErrorSolicitudException("Identificador de solicitud inválido.");
+
+        return await db.Solicitudes
+            .Include(s => s.Entrega).ThenInclude(e => e!.Empleado)
+            .Include(s => s.Entrega).ThenInclude(e => e!.Dispositivo)
+            .Include(s => s.Entrega).ThenInclude(e => e!.Estado)
+            .Include(s => s.Entrega).ThenInclude(e => e!.Canal)
+            .Include(s => s.Entrega).ThenInclude(e => e!.Distrito)
+            .FirstOrDefaultAsync(s => s.IdSolicitudOrigen == idOrigen, ct);
+    }
+
     private async Task<SolicitudFirma?> BuscarPorOrigenAsync(string idSolicitud, CancellationToken ct)
     {
         var idOrigen = TextoMobiControl.Normalizar(idSolicitud, 100)
@@ -326,21 +489,26 @@ public class ServicioSolicitudes(
             Utc(solicitud.FechaVencimiento),
             duplicada);
 
-    private static SolicitudDto AVista(SolicitudFirma solicitud) =>
-        new(solicitud.SolicitudUid,
-            solicitud.IdSolicitudOrigen,
+    private SolicitudDto AVista(SolicitudFirma solicitud) =>
+        new(solicitud.IdSolicitudOrigen,
+            solicitud.SolicitudUid,
             EstadoVisible(solicitud),
             Utc(solicitud.FechaCreacion),
+            Utc(solicitud.FechaActualizacion),
             Utc(solicitud.FechaVencimiento),
             Utc(solicitud.FechaFirma),
+            Utc(solicitud.FechaRechazo),
+            solicitud.MotivoRechazo,
+            solicitud.RechazadoPor,
+            solicitud.Entrega is not null ? enlaces.UrlDocumento(solicitud.SolicitudUid) : null,
+            LeerDatos(solicitud),
+            solicitud.Entrega is { Empleado: not null, Dispositivo: not null } entrega ? ActaFirmadaDto.Desde(entrega) : null,
             solicitud.Entrega?.EntregaUid,
             solicitud.EstadoCallback?.ToString(),
             solicitud.IntentosCallback,
             solicitud.CodigoHttpCallback,
             solicitud.UltimoErrorCallback,
-            Utc(solicitud.FechaCallback),
-            Utc(solicitud.FechaRechazo),
-            solicitud.MotivoRechazo);
+            Utc(solicitud.FechaCallback));
 
     private static string EstadoVisible(SolicitudFirma solicitud) =>
         solicitud.Estado == EstadoSolicitud.PENDIENTE && solicitud.FechaVencimiento <= DateTime.UtcNow

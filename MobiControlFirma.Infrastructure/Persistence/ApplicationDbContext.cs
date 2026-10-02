@@ -315,12 +315,23 @@ public class ApplicationDbContext(
 
             e.Property(x => x.DatosOrigen).HasColumnType("nvarchar(max)").IsRequired();
 
+            // Por aquí busca el formulario del equipo los datos que mandó el origen.
+            e.Property(x => x.Imei).HasColumnType("varchar(50)");
+            e.Property(x => x.Serial).HasColumnType("varchar(100)");
+            e.HasIndex(x => new { x.EmpresaId, x.Imei }).HasFilter("[Imei] IS NOT NULL")
+                .HasDatabaseName("IX_SolicitudesFirma_Imei");
+            e.HasIndex(x => new { x.EmpresaId, x.Serial }).HasFilter("[Serial] IS NOT NULL")
+                .HasDatabaseName("IX_SolicitudesFirma_Serial");
+
             e.Property(x => x.Estado)
                 .HasConversion<string>()
                 .HasColumnType("varchar(20)")
                 .HasDefaultValue(EstadoSolicitud.PENDIENTE);
 
             e.Property(x => x.FechaCreacion).HasDefaultValueSql("SYSUTCDATETIME()");
+            e.Property(x => x.FechaActualizacion).HasDefaultValueSql("SYSUTCDATETIME()");
+            e.HasIndex(x => new { x.EmpresaId, x.FechaActualizacion })
+                .HasDatabaseName("IX_SolicitudesFirma_Cambios");
 
             e.Property(x => x.EstadoCallback).HasConversion<string>().HasColumnType("varchar(20)");
             e.Property(x => x.MotivoRechazo).HasMaxLength(500);

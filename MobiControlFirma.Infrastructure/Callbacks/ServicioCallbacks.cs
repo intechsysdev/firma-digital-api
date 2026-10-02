@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MobiControlFirma.Application.Common.Interfaces;
+using MobiControlFirma.Application.Solicitudes;
 using MobiControlFirma.Domain.Entities;
 using MobiControlFirma.Domain.Enums;
 using MobiControlFirma.Infrastructure.Persistence;
@@ -120,7 +121,12 @@ public class ServicioCallbacks(
 
         if (!config.CallbackConfigurado)
         {
-            Marcar(solicitud, false, null, "La empresa no tiene CALLBACK_URL configurada en One.");
+            // Sin URL la empresa no recibe avisos (consulta el estado con el GET): reintentar
+            // solo llenaría el registro de errores. Si después configura la URL, el reintento
+            // manual lo vuelve a poner en cola.
+            solicitud.EstadoCallback = EstadoCallback.DESCARTADO;
+            solicitud.UltimoErrorCallback = "La empresa no tiene CALLBACK_URL configurada en One: no se avisa.";
+            solicitud.ProximoIntentoCallback = null;
             return;
         }
 
@@ -222,39 +228,8 @@ public class ServicioCallbacks(
             slug = solicitud.Empresa.OneSlug,
             nombre = solicitud.Empresa.Nombre,
         },
-        acta = new
-        {
-            entregaUid = entrega.EntregaUid,
-            numero = entrega.EntregaUid.ToString()[..8].ToUpperInvariant(),
-            // La base guarda UTC pero lo devuelve sin marcar; sin la Z el origen lo leería en su hora local.
-            fechaFirma = DateTime.SpecifyKind(entrega.FechaFirma, DateTimeKind.Utc),
-            ciudadFirma = entrega.CiudadFirma,
-            fechaEntrega = entrega.FechaEntregaProgramada,
-            estadoProceso = entrega.EstadoProceso.ToString(),
-            firmante = new
-            {
-                nombre = entrega.NombreAsociadoFirmante,
-                nombreTenedor = entrega.Empleado.NombreCompleto,
-                cedula = entrega.Empleado.Cedula,
-                correo = entrega.CorreoAsociado,
-            },
-            equipo = new
-            {
-                deviceId = entrega.Dispositivo.MobiControlDeviceId,
-                tipoDispositivo = entrega.Dispositivo.TipoDispositivo,
-                serial = entrega.Dispositivo.Serial,
-                fabricante = entrega.Dispositivo.Fabricante,
-                modelo = entrega.Dispositivo.Modelo,
-                imei = entrega.Dispositivo.IMEI,
-                iccid = entrega.ICCID,
-                numeroCelular = entrega.NumeroCelular,
-                estado = entrega.Estado?.Nombre,
-                canal = entrega.Canal?.Nombre,
-                distrito = entrega.Distrito?.Nombre,
-                costo = entrega.CostoEquipo,
-                entregables = entrega.Entregables,
-            },
-        },
+        // Lo mismo que devuelve la consulta de la solicitud.
+        acta = ActaFirmadaDto.Desde(entrega),
         documento = new
         {
             nombreArchivo = entrega.DocumentoPdf!.NombreArchivo,

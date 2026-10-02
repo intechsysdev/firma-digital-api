@@ -1,14 +1,16 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using MobiControlFirma.API.Configuration;
+using MobiControlFirma.Application.Common;
 using MobiControlFirma.Application.Entregas;
+using MobiControlFirma.Application.Solicitudes;
 
 namespace MobiControlFirma.API.Controllers;
 
 /// <summary>Actas de entrega firmadas desde el dispositivo.</summary>
 [ApiController]
 [Route("api/v1/entregas")]
-public class EntregasController(IServicioEntregas entregas) : ControllerBase
+public class EntregasController(IServicioEntregas entregas, IServicioSolicitudes solicitudes) : ControllerBase
 {
     /// <summary>
     /// Registra el acta firmada: guarda la firma, genera el PDF y marca el equipo en MobiControl.
@@ -22,11 +24,13 @@ public class EntregasController(IServicioEntregas entregas) : ControllerBase
     public async Task<ActionResult<EntregaCreadaResponse>> Registrar(
         RegistrarEntregaRequest solicitud, CancellationToken ct)
     {
-        var resultado = await entregas.RegistrarAsync(
-            solicitud,
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
-            Request.Headers.UserAgent.ToString(),
-            ct);
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var agente = Request.Headers.UserAgent.ToString();
+
+        // Con los datos precargados de una solicitud del origen, el acta se ata a ella.
+        var resultado = TextoMobiControl.Normalizar(solicitud.IdSolicitud) is null
+            ? await entregas.RegistrarAsync(solicitud, ip, agente, ct)
+            : await solicitudes.RegistrarDesdeEquipoAsync(solicitud, ip, agente, ct);
 
         // El reenvío de un acta que ya existía devuelve 200: para el formulario es un éxito,
         // pero no se creó nada nuevo.

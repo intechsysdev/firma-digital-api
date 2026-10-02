@@ -30,9 +30,23 @@ public class SolicitudFirma : IDeEmpresa
     /// <summary>Datos precargados en JSON, tal como los envió el origen ya normalizados.</summary>
     public string DatosOrigen { get; set; } = "{}";
 
+    /// <summary>
+    /// IMEI y serial del equipo, solo dígitos y letras. Duplican lo que ya está en
+    /// <see cref="DatosOrigen"/> para que el formulario del equipo encuentre su solicitud con un
+    /// índice en vez de leer el JSON de cada fila.
+    /// </summary>
+    public string? Imei { get; set; }
+    public string? Serial { get; set; }
+
     public EstadoSolicitud Estado { get; set; } = EstadoSolicitud.PENDIENTE;
 
     public DateTime FechaCreacion { get; set; }
+
+    /// <summary>
+    /// Último cambio: creación, datos corregidos por el origen, firma o rechazo. Es por donde el
+    /// origen pregunta qué cambió desde su última revisión, cuando no recibe avisos.
+    /// </summary>
+    public DateTime FechaActualizacion { get; set; }
 
     /// <summary>Pasada esta fecha el enlace deja de aceptar firmas.</summary>
     public DateTime FechaVencimiento { get; set; }

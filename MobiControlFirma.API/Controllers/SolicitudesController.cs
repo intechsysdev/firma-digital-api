@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using MobiControlFirma.API.Configuration;
+using MobiControlFirma.Application.Entregas;
 using MobiControlFirma.Application.Solicitudes;
 
 namespace MobiControlFirma.API.Controllers;
@@ -32,7 +33,38 @@ public class SolicitudesController(IServicioSolicitudes solicitudes) : Controlle
             : CreatedAtAction(nameof(Obtener), new { idSolicitud = resultado.IdSolicitud }, resultado);
     }
 
-    /// <summary>Estado de la solicitud y de su callback, por el identificador del origen.</summary>
+    /// <summary>
+    /// Solicitudes que cambiaron (creadas, corregidas, firmadas o rechazadas) desde una fecha, de
+    /// la más vieja a la más nueva. Para sincronizar sin recibir avisos: guarde la
+    /// <c>fechaActualizacion</c> de la última que procesó y úsela como <c>desde</c> la próxima vez.
+    /// </summary>
+    [HttpGet]
+    public async Task<ActionResult<PaginaDto<SolicitudResumenDto>>> Listar(
+        [FromQuery] DateTimeOffset? desde,
+        [FromQuery] string? estado,
+        [FromQuery] int pagina = 1,
+        [FromQuery] int tamanoPagina = 100,
+        CancellationToken ct = default) =>
+        Ok(await solicitudes.ListarAsync(desde, estado, pagina, tamanoPagina, ct));
+
+    /// <summary>
+    /// La solicitud pendiente de un equipo, por IMEI o serial. La usa el formulario del equipo
+    /// para completar lo que MobiControl no tiene; 404 si el origen no mandó ninguna.
+    /// </summary>
+    [HttpGet("pendiente")]
+    public async Task<ActionResult<PrecargaEquipoDto>> Pendiente(
+        [FromQuery] string? imei, [FromQuery] string? serial, CancellationToken ct)
+    {
+        var precarga = await solicitudes.BuscarPrecargaAsync(imei, serial, ct);
+        return precarga is null
+            ? NotFound(new { message = "No hay una solicitud pendiente para este equipo." })
+            : Ok(precarga);
+    }
+
+    /// <summary>
+    /// Todo de la solicitud por el identificador del origen: los datos que se mandaron, el estado
+    /// y, si se firmó, el acta con lo que se firmó y la URL del PDF.
+    /// </summary>
     [HttpGet("{idSolicitud}")]
     public async Task<ActionResult<SolicitudDto>> Obtener(string idSolicitud, CancellationToken ct)
     {
@@ -40,6 +72,17 @@ public class SolicitudesController(IServicioSolicitudes solicitudes) : Controlle
         return solicitud is null
             ? NotFound(new { message = "No existe una solicitud con ese identificador." })
             : Ok(solicitud);
+    }
+
+    /// <summary>El acta firmada en PDF. 404 mientras no se haya firmado.</summary>
+    [HttpGet("{idSolicitud}/pdf")]
+    public async Task<IActionResult> DescargarPdf(string idSolicitud, CancellationToken ct)
+    {
+        var archivo = await solicitudes.DescargarPdfPorOrigenAsync(idSolicitud, ct);
+        if (archivo is null) return NotFound(new { message = "La solicitud no existe o todavía no está firmada." });
+
+        Response.Headers.ContentDisposition = $"inline; filename=\"{archivo.NombreArchivo}\"";
+        return File(archivo.Contenido, archivo.TipoContenido);
     }
 
     /// <summary>

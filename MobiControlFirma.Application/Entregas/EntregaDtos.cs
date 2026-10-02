@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
+using MobiControlFirma.Application.Common;
 
 namespace MobiControlFirma.Application.Entregas;
 
@@ -70,6 +72,14 @@ public class RegistrarEntregaRequest
     /// </summary>
     [MaxLength(100)]
     public string? ClaveIdempotencia { get; set; }
+
+    /// <summary>
+    /// Solicitud del sistema de origen de la que salieron los datos precargados (en HV, el ID de
+    /// SharePoint). Con él el acta queda atada a la solicitud y el origen la ve al consultarla.
+    /// </summary>
+    [MaxLength(100)]
+    [JsonConverter(typeof(TextoONumeroJsonConverter))]
+    public string? IdSolicitud { get; set; }
 
     /// <summary>Se puede apagar para pruebas: guarda el acta sin tocar MobiControl.</summary>
     public bool SincronizarMobiControl { get; set; } = true;
