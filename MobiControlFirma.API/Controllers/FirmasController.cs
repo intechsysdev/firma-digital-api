@@ -34,6 +34,12 @@ public class FirmasController(IServicioSolicitudes solicitudes) : ControllerBase
             Request.Headers.UserAgent.ToString(),
             ct));
 
+    /// <summary>El asociado no acepta el acta. Se avisa al sistema de origen.</summary>
+    [HttpPost("rechazar")]
+    public async Task<ActionResult<RechazoRegistradoResponse>> Rechazar(
+        RechazarSolicitudRequest rechazo, CancellationToken ct) =>
+        Ok(await solicitudes.RechazarAsync(SolicitudUid, rechazo, ct));
+
     /// <summary>El acta firmada, para que el asociado la vea al terminar.</summary>
     [HttpGet("pdf")]
     public async Task<IActionResult> DescargarPdf(CancellationToken ct)

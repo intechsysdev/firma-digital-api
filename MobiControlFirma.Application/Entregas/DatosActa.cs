@@ -26,5 +26,6 @@ public record DatosActa
 
     public required string CiudadFirma { get; init; }
     public required DateTime FechaFirma { get; init; }
+    public DateOnly? FechaEntrega { get; init; }
     public string? DeviceId { get; init; }
 }

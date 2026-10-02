@@ -32,9 +32,17 @@ public class EnlacesFirma(IDataProtectionProvider proveedor, IOptions<AppOptions
             throw new InvalidOperationException(
                 "Falta 'App:UrlFront': sin la dirección del front no se puede armar el enlace de firma.");
 
-        var token = WebEncoders.Base64UrlEncode(protector.Protect(solicitudUid.ToByteArray()));
-        return $"{raiz}/firmar/{token}";
+        return $"{raiz}/firmar/{Token(solicitudUid)}";
     }
+
+    public string? UrlDocumento(Guid solicitudUid)
+    {
+        var raiz = opciones.Value.UrlApi?.Trim().TrimEnd('/');
+        return string.IsNullOrWhiteSpace(raiz) ? null : $"{raiz}/api/v1/firmas/{Token(solicitudUid)}/pdf";
+    }
+
+    private string Token(Guid solicitudUid) =>
+        WebEncoders.Base64UrlEncode(protector.Protect(solicitudUid.ToByteArray()));
 
     public Guid? LeerToken(string token)
     {

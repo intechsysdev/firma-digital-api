@@ -27,5 +27,12 @@ public interface IServicioSolicitudes
         Guid solicitudUid, FirmarSolicitudRequest firma, string? ipOrigen, string? userAgent,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// El asociado no acepta el acta. Es definitivo, y se avisa al origen como una firma. Rechazar
+    /// dos veces devuelve el primer rechazo.
+    /// </summary>
+    Task<RechazoRegistradoResponse> RechazarAsync(
+        Guid solicitudUid, RechazarSolicitudRequest rechazo, CancellationToken ct = default);
+
     Task<ArchivoDescargado?> DescargarPdfAsync(Guid solicitudUid, CancellationToken ct = default);
 }

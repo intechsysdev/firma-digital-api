@@ -33,6 +33,7 @@ public class ServicioCallbacks(
     public const string ClienteHttp = "callbacks";
 
     public const string Evento = "firma.completada";
+    public const string EventoRechazo = "firma.rechazada";
 
     private static readonly TimeSpan Intervalo = TimeSpan.FromSeconds(20);
 
@@ -72,6 +73,8 @@ public class ServicioCallbacks(
         var db = ambito.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var configuracion = ambito.ServiceProvider.GetRequiredService<IProveedorConfiguracion>();
         var almacenamiento = ambito.ServiceProvider.GetRequiredService<IAlmacenamientoArchivos>();
+        // Lo registra el API; sin él el aviso sale igual, solo que sin URL de descarga.
+        var enlaces = ambito.ServiceProvider.GetService<IEnlacesFirma>();
 
         var ahora = DateTime.UtcNow;
 
@@ -89,7 +92,7 @@ public class ServicioCallbacks(
 
         foreach (var solicitud in pendientes)
         {
-            await ProcesarAsync(db, configuracion, almacenamiento, solicitud, ct);
+            await ProcesarAsync(db, configuracion, almacenamiento, enlaces, solicitud, ct);
 
             // Se guarda uno por uno: si el origen de la siguiente tarda hasta el timeout, el
             // resultado de esta ya quedó escrito y no se vuelve a avisar dos veces.
@@ -101,6 +104,7 @@ public class ServicioCallbacks(
         ApplicationDbContext db,
         IProveedorConfiguracion configuracion,
         IAlmacenamientoArchivos almacenamiento,
+        IEnlacesFirma? enlaces,
         SolicitudFirma solicitud,
         CancellationToken ct)
     {
@@ -120,31 +124,45 @@ public class ServicioCallbacks(
             return;
         }
 
-        var entrega = await db.Entregas.IgnoreQueryFilters().AsNoTracking()
-            .Include(e => e.Empleado)
-            .Include(e => e.Dispositivo)
-            .Include(e => e.Estado)
-            .Include(e => e.Canal)
-            .Include(e => e.Distrito)
-            .Include(e => e.DocumentoPdf)
-            .FirstOrDefaultAsync(e => e.EntregaId == solicitud.EntregaId, ct);
+        string evento;
+        object carga;
 
-        if (entrega?.DocumentoPdf is null)
+        if (solicitud.Estado == EstadoSolicitud.RECHAZADA)
         {
-            Marcar(solicitud, false, null, "No se encontró el acta o su documento.");
-            return;
+            evento = EventoRechazo;
+            carga = CargaRechazo(solicitud);
+        }
+        else
+        {
+            var entrega = await db.Entregas.IgnoreQueryFilters().AsNoTracking()
+                .Include(e => e.Empleado)
+                .Include(e => e.Dispositivo)
+                .Include(e => e.Estado)
+                .Include(e => e.Canal)
+                .Include(e => e.Distrito)
+                .Include(e => e.DocumentoPdf)
+                .FirstOrDefaultAsync(e => e.EntregaId == solicitud.EntregaId, ct);
+
+            if (entrega?.DocumentoPdf is null)
+            {
+                Marcar(solicitud, false, null, "No se encontró el acta o su documento.");
+                return;
+            }
+
+            var pdf = await almacenamiento.LeerAsync(
+                entrega.DocumentoPdf.NombreContenedor, entrega.DocumentoPdf.RutaBlob, ct);
+
+            if (pdf is null)
+            {
+                Marcar(solicitud, false, null, "El archivo del acta no está en el almacenamiento.");
+                return;
+            }
+
+            evento = Evento;
+            carga = Carga(solicitud, entrega, pdf, enlaces?.UrlDocumento(solicitud.SolicitudUid));
         }
 
-        var pdf = await almacenamiento.LeerAsync(
-            entrega.DocumentoPdf.NombreContenedor, entrega.DocumentoPdf.RutaBlob, ct);
-
-        if (pdf is null)
-        {
-            Marcar(solicitud, false, null, "El archivo del acta no está en el almacenamiento.");
-            return;
-        }
-
-        var cuerpo = JsonSerializer.Serialize(Carga(solicitud, entrega, pdf), Json);
+        var cuerpo = JsonSerializer.Serialize(carga, Json);
         var marcaTiempo = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
 
         using var peticion = new HttpRequestMessage(HttpMethod.Post, config.CallbackUrl)
@@ -152,7 +170,7 @@ public class ServicioCallbacks(
             Content = new StringContent(cuerpo, Encoding.UTF8, "application/json"),
         };
 
-        peticion.Headers.Add("X-Firma-Evento", Evento);
+        peticion.Headers.Add("X-Firma-Evento", evento);
         // Estable entre reintentos: el origen puede usarlo para no procesar dos veces el mismo aviso.
         peticion.Headers.Add("X-Firma-Id", solicitud.SolicitudUid.ToString());
         peticion.Headers.Add("X-Firma-Timestamp", marcaTiempo);
@@ -189,10 +207,14 @@ public class ServicioCallbacks(
     /// Lo que recibe el origen. Lleva el PDF adentro a propósito: el origen no tiene credencial
     /// para descargarlo de este API, y con el documento en el aviso no necesita ninguna.
     /// </summary>
-    private static object Carga(SolicitudFirma solicitud, EntregaDispositivo entrega, byte[] pdf) => new
+    private static object Carga(SolicitudFirma solicitud, EntregaDispositivo entrega, byte[] pdf, string? urlDocumento) => new
     {
         evento = Evento,
         idSolicitud = solicitud.IdSolicitudOrigen,
+        // Lo mínimo para un flujo que solo necesita cerrar la solicitud, sin recorrer el resto.
+        estado = "Firmado",
+        fechaFirma = DateTime.SpecifyKind(entrega.FechaFirma, DateTimeKind.Utc),
+        urlDocumento,
         solicitudUid = solicitud.SolicitudUid,
         empresa = new
         {
@@ -207,6 +229,7 @@ public class ServicioCallbacks(
             // La base guarda UTC pero lo devuelve sin marcar; sin la Z el origen lo leería en su hora local.
             fechaFirma = DateTime.SpecifyKind(entrega.FechaFirma, DateTimeKind.Utc),
             ciudadFirma = entrega.CiudadFirma,
+            fechaEntrega = entrega.FechaEntregaProgramada,
             estadoProceso = entrega.EstadoProceso.ToString(),
             firmante = new
             {
@@ -238,6 +261,24 @@ public class ServicioCallbacks(
             tipoContenido = "application/pdf",
             sha256 = entrega.DocumentoPdf.HashSHA256 is { } hash ? Convert.ToHexStringLower(hash) : null,
             base64 = Convert.ToBase64String(pdf),
+        },
+    };
+
+    /// <summary>El asociado no aceptó el acta: no hay documento, pero sí motivo y fecha.</summary>
+    private static object CargaRechazo(SolicitudFirma solicitud) => new
+    {
+        evento = EventoRechazo,
+        idSolicitud = solicitud.IdSolicitudOrigen,
+        estado = "Rechazado",
+        fechaRechazo = solicitud.FechaRechazo is { } fecha ? DateTime.SpecifyKind(fecha, DateTimeKind.Utc) : (DateTime?)null,
+        motivoRechazo = solicitud.MotivoRechazo,
+        rechazadoPor = solicitud.RechazadoPor,
+        solicitudUid = solicitud.SolicitudUid,
+        empresa = new
+        {
+            oneTenantId = solicitud.Empresa.OneTenantId,
+            slug = solicitud.Empresa.OneSlug,
+            nombre = solicitud.Empresa.Nombre,
         },
     };
 

@@ -190,7 +190,10 @@ public class GeneradorActaPdf : IGeneradorActaPdf
                 Fila(tabla, "IMEI", datos.Imei, "SIMCARD", datos.Iccid);
                 Fila(tabla, "No. Celular", datos.NumeroCelular, "Estado", datos.Estado);
                 Fila(tabla, "Canal", datos.Canal, "Distrito", datos.Distrito);
-                Fila(tabla, "Costo equipo", FormatearMoneda(datos.CostoEquipo), "ID dispositivo", datos.DeviceId);
+                Fila(tabla, "Costo equipo", FormatearMoneda(datos.CostoEquipo), "Fecha de entrega",
+                    datos.FechaEntrega?.ToString("dd/MM/yyyy", Colombia));
+                if (datos.DeviceId is not null)
+                    Fila(tabla, "ID dispositivo", datos.DeviceId, "", null);
             });
         });
 

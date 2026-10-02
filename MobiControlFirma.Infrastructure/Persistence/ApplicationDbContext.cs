@@ -299,7 +299,7 @@ public class ApplicationDbContext(
         {
             e.ToTable("SolicitudesFirma", t =>
             {
-                t.HasCheckConstraint("CK_SolicitudesFirma_Estado", "[Estado] IN ('PENDIENTE','FIRMADA')");
+                t.HasCheckConstraint("CK_SolicitudesFirma_Estado", "[Estado] IN ('PENDIENTE','FIRMADA','RECHAZADA')");
                 t.HasCheckConstraint("CK_SolicitudesFirma_DatosJson", "ISJSON([DatosOrigen]) = 1");
             });
 
@@ -323,6 +323,8 @@ public class ApplicationDbContext(
             e.Property(x => x.FechaCreacion).HasDefaultValueSql("SYSUTCDATETIME()");
 
             e.Property(x => x.EstadoCallback).HasConversion<string>().HasColumnType("varchar(20)");
+            e.Property(x => x.MotivoRechazo).HasMaxLength(500);
+            e.Property(x => x.RechazadoPor).HasMaxLength(200);
             e.Property(x => x.UltimoErrorCallback).HasMaxLength(1000);
 
             // Por aquí barre el proceso de fondo que avisa al origen.

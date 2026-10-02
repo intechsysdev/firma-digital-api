@@ -39,6 +39,16 @@ public class SolicitudFirma : IDeEmpresa
 
     public DateTime? FechaFirma { get; set; }
 
+    // ---- Rechazo ----
+    // El asociado puede no aceptar el acta (el equipo no corresponde, los datos están mal…). Se
+    // guarda quién y por qué, y se avisa al origen igual que una firma.
+
+    public DateTime? FechaRechazo { get; set; }
+    public string? MotivoRechazo { get; set; }
+
+    /// <summary>Nombre que escribió quien rechazó, si lo escribió.</summary>
+    public string? RechazadoPor { get; set; }
+
     /// <summary>Acta que resultó de firmar. Null mientras la solicitud está pendiente.</summary>
     public int? EntregaId { get; set; }
     public EntregaDispositivo? Entrega { get; set; }

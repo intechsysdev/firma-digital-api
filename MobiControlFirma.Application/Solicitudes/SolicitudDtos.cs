@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
+using MobiControlFirma.Application.Common;
 
 namespace MobiControlFirma.Application.Solicitudes;
 
@@ -52,7 +54,14 @@ public class CrearSolicitudRequest : DatosActaEditables
     /// llave de la integración: vuelve tal cual en la consulta y en el callback.
     /// </summary>
     [Required, MaxLength(100)]
+    [JsonConverter(typeof(TextoONumeroJsonConverter))]
     public string IdSolicitud { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Fecha de entrega del equipo. Se imprime en el acta y es la que se escribe en MobiControl.
+    /// Si no llega, se usa el día siguiente a la firma.
+    /// </summary>
+    public DateOnly? FechaEntrega { get; set; }
 
     /// <summary>
     /// Equivale a <c>%deviceid%</c>. Opcional: si no llega, se busca el equipo en MobiControl por
@@ -96,7 +105,8 @@ public record DatosSolicitud(
     string? Entregables,
     string? CiudadFirma,
     string? TipoDispositivo = null,
-    string? Serial = null);
+    string? Serial = null,
+    DateOnly? FechaEntrega = null);
 
 /// <param name="Duplicada">True cuando el origen ya había pedido esta misma solicitud.</param>
 /// <param name="UrlFirma">Enlace para firmar. Cada respuesta trae uno nuevo y todos siguen sirviendo.</param>
@@ -121,7 +131,9 @@ public record SolicitudDto(
     int IntentosCallback,
     int? CodigoHttpCallback,
     string? UltimoErrorCallback,
-    DateTime? FechaCallback);
+    DateTime? FechaCallback,
+    DateTime? FechaRechazo = null,
+    string? MotivoRechazo = null);
 
 /// <summary>Lo que el formulario web necesita para pintarse.</summary>
 public record FormularioFirmaDto(
@@ -131,7 +143,23 @@ public record FormularioFirmaDto(
     DatosSolicitud Datos,
     Guid? EntregaUid,
     DateTime? FechaFirma,
-    string? NombreAsociadoFirmante);
+    string? NombreAsociadoFirmante,
+    DateTime? FechaRechazo = null,
+    string? MotivoRechazo = null);
+
+/// <summary>El asociado no acepta el acta.</summary>
+public class RechazarSolicitudRequest
+{
+    /// <summary>Por qué no la acepta. Va al sistema de origen en el aviso.</summary>
+    [Required, MaxLength(500)]
+    public string Motivo { get; set; } = string.Empty;
+
+    /// <summary>Nombre de quien rechaza, si lo escribe.</summary>
+    [MaxLength(200)]
+    public string? Nombre { get; set; }
+}
+
+public record RechazoRegistradoResponse(DateTime FechaRechazo, bool Duplicado);
 
 /// <summary>Respuesta al firmar: lo mínimo para mostrar la pantalla final.</summary>
 public record FirmaRegistradaResponse(Guid EntregaUid, DateTime FechaFirma, string EstadoProceso, bool Duplicada);

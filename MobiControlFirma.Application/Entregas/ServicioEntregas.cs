@@ -125,6 +125,7 @@ public class ServicioEntregas(
             Entregables = entrega.Entregables,
             CiudadFirma = entrega.CiudadFirma,
             FechaFirma = entrega.FechaFirma,
+            FechaEntrega = entrega.FechaEntregaProgramada,
             DeviceId = dispositivo.MobiControlDeviceId,
         };
 

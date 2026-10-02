@@ -47,6 +47,9 @@ public enum EstadoSolicitud
 
     /// <summary>Se firmó y el acta ya existe.</summary>
     FIRMADA,
+
+    /// <summary>El asociado no aceptó el acta. Es definitivo: el enlace ya no admite firma.</summary>
+    RECHAZADA,
 }
 
 /// <summary>En qué punto va el aviso al sistema de origen de que la firma se completó.</summary>

@@ -89,7 +89,8 @@ public class ServicioSolicitudes(
             Entregables: TextoMobiControl.Normalizar(solicitud.Entregables),
             CiudadFirma: ciudad,
             TipoDispositivo: TextoMobiControl.Normalizar(solicitud.TipoDispositivo, 30),
-            Serial: serial);
+            Serial: serial,
+            FechaEntrega: solicitud.FechaEntrega);
 
         var ahora = DateTime.UtcNow;
 
@@ -123,8 +124,8 @@ public class ServicioSolicitudes(
         var solicitud = await BuscarPorOrigenAsync(idSolicitud, ct)
             ?? throw new ErrorSolicitudException("No existe una solicitud con ese identificador.");
 
-        if (solicitud.Estado != EstadoSolicitud.FIRMADA)
-            throw new ErrorSolicitudException("La solicitud todavía no se ha firmado: no hay nada que avisar.");
+        if (solicitud.Estado == EstadoSolicitud.PENDIENTE)
+            throw new ErrorSolicitudException("La solicitud todavía no se ha firmado ni rechazado: no hay nada que avisar.");
 
         // Los intentos se reinician: si se reintenta a mano es porque se corrigió algo (casi
         // siempre la URL del callback en One) y merece la escalera completa otra vez.
@@ -152,7 +153,9 @@ public class ServicioSolicitudes(
             LeerDatos(solicitud),
             solicitud.Entrega?.EntregaUid,
             Utc(solicitud.FechaFirma),
-            solicitud.Entrega?.NombreAsociadoFirmante);
+            solicitud.Entrega?.NombreAsociadoFirmante,
+            Utc(solicitud.FechaRechazo),
+            solicitud.MotivoRechazo);
     }
 
     public async Task<FirmaRegistradaResponse> FirmarAsync(
@@ -168,6 +171,9 @@ public class ServicioSolicitudes(
         // y lo que necesita es ver su acta, no un mensaje de rechazo.
         if (solicitud is { Estado: EstadoSolicitud.FIRMADA, Entrega: { } previa })
             return new FirmaRegistradaResponse(previa.EntregaUid, Utc(previa.FechaFirma), previa.EstadoProceso.ToString(), true);
+
+        if (solicitud.Estado == EstadoSolicitud.RECHAZADA)
+            throw new ErrorSolicitudException("Esta acta fue rechazada; ya no se puede firmar.");
 
         if (solicitud.FechaVencimiento <= DateTime.UtcNow)
             throw new ErrorSolicitudException(
@@ -201,6 +207,7 @@ public class ServicioSolicitudes(
             Costo = firma.Costo,
             Entregables = firma.Entregables,
             CiudadFirma = TextoMobiControl.Normalizar(firma.CiudadFirma, 100) ?? datos.CiudadFirma ?? "Cali",
+            FechaEntregaProgramada = datos.FechaEntrega,
             FirmaBase64 = firma.FirmaBase64,
             // Atada a la solicitud y no al envío: aunque el formulario mande dos veces, o se
             // caiga el servidor entre guardar el acta y marcar la solicitud, sale una sola acta.
@@ -224,6 +231,39 @@ public class ServicioSolicitudes(
 
         return new FirmaRegistradaResponse(
             registro.EntregaUid, registro.FechaFirma, registro.EstadoProceso, registro.Duplicada);
+    }
+
+    public async Task<RechazoRegistradoResponse> RechazarAsync(
+        Guid solicitudUid, RechazarSolicitudRequest rechazo, CancellationToken ct = default)
+    {
+        var solicitud = await db.Solicitudes
+            .FirstOrDefaultAsync(s => s.SolicitudUid == solicitudUid, ct)
+            ?? throw new ErrorSolicitudException("El enlace no corresponde a ninguna solicitud.");
+
+        // Un doble clic no es un segundo rechazo: se devuelve el que ya quedó.
+        if (solicitud is { Estado: EstadoSolicitud.RECHAZADA, FechaRechazo: { } fecha })
+            return new RechazoRegistradoResponse(Utc(fecha), true);
+
+        if (solicitud.Estado == EstadoSolicitud.FIRMADA)
+            throw new ErrorSolicitudException("Esta acta ya fue firmada; no se puede rechazar.");
+
+        if (solicitud.FechaVencimiento <= DateTime.UtcNow)
+            throw new ErrorSolicitudException("Este enlace venció.");
+
+        var motivo = TextoMobiControl.Normalizar(rechazo.Motivo, 500)
+            ?? throw new ErrorSolicitudException("Cuéntanos por qué no aceptas el acta.");
+
+        solicitud.Estado = EstadoSolicitud.RECHAZADA;
+        solicitud.FechaRechazo = DateTime.UtcNow;
+        solicitud.MotivoRechazo = motivo;
+        solicitud.RechazadoPor = TextoMobiControl.Normalizar(rechazo.Nombre, 200);
+        solicitud.EstadoCallback = EstadoCallback.PENDIENTE;
+        solicitud.ProximoIntentoCallback = null;
+
+        await db.SaveChangesAsync(ct);
+
+        logger.LogInformation("Solicitud {Origen} rechazada por el asociado. Se avisa al origen.", solicitud.IdSolicitudOrigen);
+        return new RechazoRegistradoResponse(Utc(solicitud.FechaRechazo.Value), false);
     }
 
     public async Task<ArchivoDescargado?> DescargarPdfAsync(Guid solicitudUid, CancellationToken ct = default)
@@ -298,7 +338,9 @@ public class ServicioSolicitudes(
             solicitud.IntentosCallback,
             solicitud.CodigoHttpCallback,
             solicitud.UltimoErrorCallback,
-            Utc(solicitud.FechaCallback));
+            Utc(solicitud.FechaCallback),
+            Utc(solicitud.FechaRechazo),
+            solicitud.MotivoRechazo);
 
     private static string EstadoVisible(SolicitudFirma solicitud) =>
         solicitud.Estado == EstadoSolicitud.PENDIENTE && solicitud.FechaVencimiento <= DateTime.UtcNow

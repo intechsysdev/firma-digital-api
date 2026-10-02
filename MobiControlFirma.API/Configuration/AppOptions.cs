@@ -17,6 +17,12 @@ public class AppOptions
     /// esto no se puede crear ninguna solicitud.
     /// </summary>
     public string? UrlFront { get; set; }
+
+    /// <summary>
+    /// Dirección pública de este API. Con ella el aviso al origen lleva una URL para descargar el
+    /// acta firmada; el aviso se arma en segundo plano, sin una petición de donde sacarla.
+    /// </summary>
+    public string? UrlApi { get; set; }
 }
 
 /// <summary>
