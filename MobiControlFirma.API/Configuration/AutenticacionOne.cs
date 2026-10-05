@@ -20,8 +20,9 @@ namespace MobiControlFirma.API.Configuration;
 /// administrador de plataforma. Delegar la validación deja el secreto donde nació.
 ///
 /// El costo es una llamada a One por petición, que se amortigua con una caché corta: lo que se
-/// guarda es el resultado de validar un token concreto, así que revocar una sesión tarda a lo
-/// sumo ese minuto en notarse.
+/// guarda es el resultado de validar un token concreto. One rechaza los tokens de una sesión ya
+/// cerrada (al salir del portal se cierran también las apps abiertas desde él), así que la caché
+/// es lo único que demora el cierre aquí: se deja en segundos.
 /// </summary>
 public class ManejadorAutenticacionOne(
     IOptionsMonitor<AuthenticationSchemeOptions> opciones,
@@ -36,7 +37,7 @@ public class ManejadorAutenticacionOne(
     /// <summary>Cliente HTTP con la URL de One ya configurada.</summary>
     public const string ClienteHttp = "one-auth";
 
-    private static readonly TimeSpan Vigencia = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan Vigencia = TimeSpan.FromSeconds(15);
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
