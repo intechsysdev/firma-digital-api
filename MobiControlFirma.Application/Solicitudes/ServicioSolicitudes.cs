@@ -55,6 +55,40 @@ public class ServicioSolicitudes(
         var cedula = TextoMobiControl.Normalizar(solicitud.Cedula, 20)
             ?? throw new ErrorSolicitudException("Falta la cédula del asociado.");
 
+        // Pedir los datos de MobiControl es decir que el equipo está allí.
+        if (solicitud is { DatosDesdeMobicontrol: true, DispositivoConMobicontrol: false })
+            throw new ErrorSolicitudException(
+                "datosDesdeMobicontrol es SI pero dispositivoConMobicontrol es NO: sin MobiControl no hay de dónde tomar los datos.");
+
+        var conMobiControl = solicitud.DispositivoConMobicontrol ?? (solicitud.DatosDesdeMobicontrol == true ? true : null);
+        var desdeMobiControl = solicitud.DatosDesdeMobicontrol == true;
+
+        var fabricante = TextoMobiControl.Normalizar(solicitud.Fabricante, 100);
+        var modelo = TextoMobiControl.Normalizar(solicitud.Modelo, 100);
+        string? nombreDispositivo = null;
+
+        // Se valida al recibir la solicitud y no al firmar: un IMEI mal escrito en el origen se
+        // corrige allí en el momento, en vez de descubrirse cuando el equipo no encuentra su acta.
+        if (conMobiControl == true)
+        {
+            var equipo = await BuscarEquipoAsync(deviceId, imei, serial, ct)
+                ?? throw new ErrorSolicitudException(
+                    $"El equipo no está en MobiControl: no hay ninguno con {Descripcion(deviceId, imei, serial)}. " +
+                    "Revise el dato o envíe dispositivoConMobicontrol: NO.");
+
+            // El deviceId se guarda siempre: es con el que se marca la entrega en la consola.
+            deviceId = equipo.DeviceId;
+            imei ??= TextoMobiControl.Normalizar(equipo.Imei, 50);
+            serial ??= TextoMobiControl.Normalizar(equipo.Serial, 100);
+
+            if (desdeMobiControl)
+            {
+                fabricante = TextoMobiControl.Normalizar(equipo.Fabricante, 100) ?? fabricante;
+                modelo = TextoMobiControl.Normalizar(equipo.Modelo, 100) ?? modelo;
+                nombreDispositivo = TextoMobiControl.Normalizar(equipo.Nombre, 200);
+            }
+        }
+
         // La ciudad del acta es de la empresa, no del equipo: si el origen no la manda se toma
         // la que la empresa tiene en One, que es la misma que usaría el formulario del equipo.
         var ciudad = TextoMobiControl.Normalizar(solicitud.CiudadFirma, 100)
@@ -65,8 +99,8 @@ public class ServicioSolicitudes(
             Cedula: cedula,
             Usuario: TextoMobiControl.Normalizar(solicitud.Usuario, 200),
             Correo: TextoMobiControl.Normalizar(solicitud.Correo, 200),
-            Fabricante: TextoMobiControl.Normalizar(solicitud.Fabricante, 100),
-            Modelo: TextoMobiControl.Normalizar(solicitud.Modelo, 100),
+            Fabricante: fabricante,
+            Modelo: modelo,
             Imei: imei,
             Iccid: TextoMobiControl.Normalizar(solicitud.Iccid, 50),
             NumeroCelular: TextoMobiControl.Normalizar(solicitud.NumeroCelular, 30),
@@ -78,7 +112,11 @@ public class ServicioSolicitudes(
             CiudadFirma: ciudad,
             TipoDispositivo: TextoMobiControl.Normalizar(solicitud.TipoDispositivo, 30),
             Serial: serial,
-            FechaEntrega: solicitud.FechaEntrega);
+            FechaEntrega: solicitud.FechaEntrega,
+            NombreDispositivo: nombreDispositivo,
+            DispositivoConMobicontrol: conMobiControl,
+            DatosDesdeMobicontrol: solicitud.DatosDesdeMobicontrol,
+            NombreDeInterfaz: TextoMobiControl.Normalizar(solicitud.NombreDeInterfaz, 50));
 
         var ahora = DateTime.UtcNow;
         var vence = ahora.AddDays(solicitud.VigenciaDias ?? VigenciaPorDefectoDias);
@@ -314,9 +352,11 @@ public class ServicioSolicitudes(
 
         var datos = LeerDatos(solicitud);
 
-        // Sin DeviceId se busca el equipo en MobiControl por lo que el asociado confirmó.
+        // Sin DeviceId se busca el equipo en MobiControl por lo que el asociado confirmó, salvo
+        // que el origen haya dicho que el equipo no está en MobiControl.
+        var conMobiControl = datos.DispositivoConMobicontrol != false;
         var deviceId = datos.DeviceId
-            ?? await BuscarEnMobiControlAsync(firma.Imei ?? datos.Imei, firma.Serial ?? datos.Serial, ct);
+            ?? (conMobiControl ? await BuscarEnMobiControlAsync(firma.Imei ?? datos.Imei, firma.Serial ?? datos.Serial, ct) : null);
 
         var registro = await entregas.RegistrarAsync(new RegistrarEntregaRequest
         {
@@ -347,7 +387,9 @@ public class ServicioSolicitudes(
             ClaveIdempotencia = $"solicitud:{solicitud.SolicitudUid:N}",
             // Aquí no hay formulario en el equipo que esperar a que se cierre: la entrega se
             // marca en MobiControl en cuanto queda firmada.
-            SincronizarMobiControl = true,
+            SincronizarMobiControl = conMobiControl,
+            // Va en el asunto del correo con el acta.
+            IdSolicitud = solicitud.IdSolicitudOrigen,
         }, ipOrigen, userAgent, ct);
 
         solicitud.Estado = EstadoSolicitud.FIRMADA;
@@ -421,15 +463,11 @@ public class ServicioSolicitudes(
     /// </summary>
     private async Task<string?> BuscarEnMobiControlAsync(string? imei, string? serial, CancellationToken ct)
     {
-        imei = TextoMobiControl.Normalizar(imei, 50);
-        serial = TextoMobiControl.Normalizar(serial, 100);
-        if (imei is null && serial is null) return null;
+        if (ClaveEquipo(imei, 50) is null && ClaveEquipo(serial, 100) is null) return null;
 
         try
         {
-            var flota = await mobiControl.ListarEquiposAsync(ct);
-            var equipo = flota.FirstOrDefault(e => imei is not null && string.Equals(e.Imei, imei, StringComparison.OrdinalIgnoreCase))
-                         ?? flota.FirstOrDefault(e => serial is not null && string.Equals(e.Serial, serial, StringComparison.OrdinalIgnoreCase));
+            var equipo = await BuscarEquipoAsync(null, imei, serial, ct);
 
             if (equipo is null)
                 logger.LogInformation("El equipo de la solicitud no está en MobiControl; el acta no lo marcará.");
@@ -442,6 +480,31 @@ public class ServicioSolicitudes(
             return null;
         }
     }
+
+    /// <summary>
+    /// El equipo en la consola de la empresa, por deviceId, IMEI o serial, en ese orden. MobiControl
+    /// no filtra por IMEI, así que se recorre la flota. Lanza ErrorSolicitudException si la empresa
+    /// no tiene consola o MobiControl no responde.
+    /// </summary>
+    private async Task<EquipoMobiControl?> BuscarEquipoAsync(string? deviceId, string? imei, string? serial, CancellationToken ct)
+    {
+        var claveImei = ClaveEquipo(imei, 50);
+        var claveSerial = ClaveEquipo(serial, 100);
+
+        var flota = await mobiControl.ListarEquiposAsync(ct);
+
+        return flota.FirstOrDefault(e => deviceId is not null && string.Equals(e.DeviceId, deviceId, StringComparison.OrdinalIgnoreCase))
+               ?? flota.FirstOrDefault(e => claveImei is not null && ClaveEquipo(e.Imei, 50) == claveImei)
+               ?? flota.FirstOrDefault(e => claveSerial is not null && ClaveEquipo(e.Serial, 100) == claveSerial);
+    }
+
+    private static string Descripcion(string? deviceId, string? imei, string? serial) =>
+        string.Join(" ni ", new[]
+        {
+            imei is null ? null : $"IMEI {imei}",
+            serial is null ? null : $"serial {serial}",
+            deviceId is null ? null : $"deviceId {deviceId}",
+        }.Where(x => x is not null));
 
     /// <summary>
     /// IMEI o serial reducidos a letras y dígitos, que es como se guardan y se buscan: el origen

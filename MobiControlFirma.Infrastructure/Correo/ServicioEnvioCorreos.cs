@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -54,15 +55,20 @@ public class ServicioEnvioCorreos(
         var enviador = ambito.ServiceProvider.GetRequiredService<IEnviadorCorreo>();
         var configuracion = ambito.ServiceProvider.GetRequiredService<IProveedorConfiguracion>();
         var almacenamiento = ambito.ServiceProvider.GetRequiredService<IAlmacenamientoArchivos>();
+        // Lo registra el API; sin él el correo sale igual, solo que sin enlace al PDF.
+        var enlaces = ambito.ServiceProvider.GetService<IEnlacesFirma>();
 
         var ahora = DateTime.UtcNow;
+        // Un acta firmada en el equipo se ata a su solicitud justo después de guardarse; se
+        // le dan unos segundos para que el correo salga ya con el enlace al PDF.
+        var reciente = ahora.AddSeconds(-10);
 
         // IgnoreQueryFilters no es un atajo: esto corre fuera de una petición, así que no hay
         // empresa en contexto y el filtro global dejaría la consulta vacía para siempre. El
         // aislamiento se mantiene igual porque cada envío ya trae su empresa decidida.
         var pendientes = await db.EnviosCorreo
             .IgnoreQueryFilters()
-            .Where(e => e.Estado == EstadoEnvioCorreo.PENDIENTE
+            .Where(e => (e.Estado == EstadoEnvioCorreo.PENDIENTE && e.FechaCreacion <= reciente)
                      || (e.Estado == EstadoEnvioCorreo.ERROR && e.ProximoIntento != null && e.ProximoIntento <= ahora))
             .OrderBy(e => e.EnvioId)
             .Take(20)
@@ -71,7 +77,7 @@ public class ServicioEnvioCorreos(
         if (pendientes.Count == 0) return;
 
         foreach (var envio in pendientes)
-            await ProcesarAsync(db, enviador, configuracion, almacenamiento, envio, ct);
+            await ProcesarAsync(db, enviador, configuracion, almacenamiento, enlaces, envio, ct);
 
         await db.SaveChangesAsync(ct);
     }
@@ -81,6 +87,7 @@ public class ServicioEnvioCorreos(
         IEnviadorCorreo enviador,
         IProveedorConfiguracion configuracion,
         IAlmacenamientoArchivos almacenamiento,
+        IEnlacesFirma? enlaces,
         EnvioCorreo envio,
         CancellationToken ct)
     {
@@ -115,9 +122,18 @@ public class ServicioEnvioCorreos(
         var destinatarios = envio.Destinatarios
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
+        // Si el acta salió de una solicitud del origen, el correo lleva su identificador y el
+        // enlace al PDF, que es lo que el origen guarda en su registro.
+        var solicitud = await db.Solicitudes.IgnoreQueryFilters().AsNoTracking()
+            .Where(s => s.EntregaId == entrega.EntregaId)
+            .Select(s => new { s.IdSolicitudOrigen, s.SolicitudUid })
+            .FirstOrDefaultAsync(ct);
+
         var resultado = await enviador.EnviarActaAsync(
             config, destinatarios, envio.Asunto,
-            CuerpoHtml(config, entrega), entrega.DocumentoPdf.NombreArchivo, pdf, ct);
+            CuerpoHtml(config, entrega, solicitud?.IdSolicitudOrigen,
+                solicitud is null ? null : enlaces?.UrlDocumento(solicitud.SolicitudUid)),
+            entrega.DocumentoPdf.NombreArchivo, pdf, ct);
 
         Marcar(envio, resultado.Exitoso, resultado.Detalle);
 
@@ -154,18 +170,33 @@ public class ServicioEnvioCorreos(
         envio.ProximoIntento = DateTime.UtcNow.Add(Esperas[envio.Intentos - 1]);
     }
 
-    private static string CuerpoHtml(ConfiguracionEmpresa config, EntregaDispositivo entrega)
+    private static string CuerpoHtml(
+        ConfiguracionEmpresa config, EntregaDispositivo entrega, string? idSolicitud, string? urlDocumento)
     {
         var equipo = string.Join(" ", new[] { entrega.Dispositivo?.Fabricante, entrega.Dispositivo?.Modelo }
             .Where(x => !string.IsNullOrWhiteSpace(x)));
 
+        const string Etiqueta = "padding:3px 12px 3px 0;color:#5b6a80";
+        static string e(string? texto) => WebUtility.HtmlEncode(texto) ?? "";
+
+        var filaSolicitud = idSolicitud is null ? "" :
+            $"""<tr><td style="{Etiqueta}">Solicitud</td><td><b>{e(idSolicitud)}</b></td></tr>""";
+        var filaEntrega = entrega.FechaEntregaProgramada is { } fecha
+            ? $"""<tr><td style="{Etiqueta}">Fecha de entrega</td><td>{fecha:yyyy-MM-dd}</td></tr>"""
+            : "";
+        var filaPdf = urlDocumento is null ? "" :
+            $"""<tr><td style="{Etiqueta}">Acta en PDF</td><td><a href="{e(urlDocumento)}">{e(urlDocumento)}</a></td></tr>""";
+
         return $"""
             <p>Adjuntamos el acta de entrega firmada.</p>
             <table style="border-collapse:collapse;font-family:sans-serif;font-size:14px">
-              <tr><td style="padding:3px 12px 3px 0;color:#5b6a80">Acta</td><td><b>{entrega.EntregaUid.ToString()[..8].ToUpperInvariant()}</b></td></tr>
-              <tr><td style="padding:3px 12px 3px 0;color:#5b6a80">Asociado</td><td>{entrega.NombreAsociadoFirmante}</td></tr>
-              <tr><td style="padding:3px 12px 3px 0;color:#5b6a80">Equipo</td><td>{(string.IsNullOrWhiteSpace(equipo) ? "-" : equipo)}</td></tr>
-              <tr><td style="padding:3px 12px 3px 0;color:#5b6a80">Fecha</td><td>{entrega.FechaFirma:yyyy-MM-dd HH:mm}</td></tr>
+              {filaSolicitud}
+              <tr><td style="{Etiqueta}">Acta</td><td><b>{entrega.EntregaUid.ToString()[..8].ToUpperInvariant()}</b></td></tr>
+              <tr><td style="{Etiqueta}">Asociado</td><td>{e(entrega.NombreAsociadoFirmante)}</td></tr>
+              <tr><td style="{Etiqueta}">Equipo</td><td>{(string.IsNullOrWhiteSpace(equipo) ? "-" : e(equipo))}</td></tr>
+              <tr><td style="{Etiqueta}">Fecha de firma</td><td>{entrega.FechaFirma:yyyy-MM-dd HH:mm} UTC</td></tr>
+              {filaEntrega}
+              {filaPdf}
             </table>
             <p style="color:#5b6a80;font-size:12px">{config.TenantNombre} · Mensaje automático, no responder.</p>
             """;

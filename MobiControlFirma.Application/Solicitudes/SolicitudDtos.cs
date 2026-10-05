@@ -74,6 +74,25 @@ public class CrearSolicitudRequest : DatosActaEditables
     /// <summary>Días que el enlace acepta firmas. Por defecto, siete.</summary>
     [Range(1, 90)]
     public int? VigenciaDias { get; set; }
+
+    /// <summary>
+    /// SI: el equipo está en MobiControl. Se valida al recibir la solicitud que la consola lo
+    /// tenga (por IMEI, serial o deviceId) y la entrega se marca allí al firmar. NO: no se toca
+    /// MobiControl; se firma por enlace. Sin valor, se busca en MobiControl al firmar si se puede.
+    /// </summary>
+    [JsonConverter(typeof(SiNoJsonConverter))]
+    public bool? DispositivoConMobicontrol { get; set; }
+
+    /// <summary>
+    /// SI: deviceId, nombre, marca y modelo se toman de MobiControl en vez de lo enviado (lo
+    /// enviado queda para lo que la consola no tenga). Implica que el equipo está en MobiControl.
+    /// </summary>
+    [JsonConverter(typeof(SiNoJsonConverter))]
+    public bool? DatosDesdeMobicontrol { get; set; }
+
+    /// <summary>Sistema que envía la solicitud ("SharePoint"). Vuelve en la consulta.</summary>
+    [MaxLength(50)]
+    public string? NombreDeInterfaz { get; set; }
 }
 
 /// <summary>Lo que devuelve el formulario al firmar: los datos ya revisados y la firma.</summary>
@@ -107,7 +126,12 @@ public record DatosSolicitud(
     string? CiudadFirma,
     string? TipoDispositivo = null,
     string? Serial = null,
-    DateOnly? FechaEntrega = null);
+    DateOnly? FechaEntrega = null,
+    // Nombre del equipo en MobiControl, cuando los datos se tomaron de allí.
+    string? NombreDispositivo = null,
+    [property: JsonConverter(typeof(SiNoJsonConverter))] bool? DispositivoConMobicontrol = null,
+    [property: JsonConverter(typeof(SiNoJsonConverter))] bool? DatosDesdeMobicontrol = null,
+    string? NombreDeInterfaz = null);
 
 /// <param name="Duplicada">True cuando el origen ya había pedido esta misma solicitud.</param>
 /// <param name="UrlFirma">Enlace para firmar. Cada respuesta trae uno nuevo y todos siguen sirviendo.</param>

@@ -167,7 +167,7 @@ public class ServicioEntregas(
         db.Entregas.Add(entrega);
         await db.SaveChangesAsync(ct);
 
-        await EncolarCopiaAsync(entrega, ct);
+        await EncolarCopiaAsync(entrega, TextoMobiControl.Normalizar(solicitud.IdSolicitud, 100), ct);
 
         // Recién aquí se llama a MobiControl: fuera de la escritura del acta, para que una
         // consola lenta o caída no se lleve por delante una firma que ya está guardada.
@@ -559,7 +559,7 @@ public class ServicioEntregas(
     /// un proveedor de correo lento no puede retrasar eso, ni un fallo suyo debe verse como si
     /// la firma hubiera fallado.
     /// </summary>
-    private async Task EncolarCopiaAsync(EntregaDispositivo entrega, CancellationToken ct)
+    private async Task EncolarCopiaAsync(EntregaDispositivo entrega, string? idSolicitud, CancellationToken ct)
     {
         // Los destinatarios fijos viven en One, como variable de la app para este tenant.
         var config = await configuracion.ObtenerAsync(entrega.EmpresaId, ct);
@@ -579,7 +579,11 @@ public class ServicioEntregas(
             EmpresaId = entrega.EmpresaId,
             EntregaId = entrega.EntregaId,
             Destinatarios = string.Join(",", destinatarios),
-            Asunto = $"Acta de entrega {entrega.EntregaUid.ToString()[..8].ToUpperInvariant()} - {entrega.NombreAsociadoFirmante}",
+            // Con solicitud del origen, el asunto lleva su identificador (en HV, el ID de
+            // SharePoint): es con lo que quien recibe el correo lo asocia a su registro.
+            Asunto = idSolicitud is not null
+                ? $"Firma digital - {idSolicitud}"
+                : $"Acta de entrega {entrega.EntregaUid.ToString()[..8].ToUpperInvariant()} - {entrega.NombreAsociadoFirmante}",
             Estado = EstadoEnvioCorreo.PENDIENTE,
             FechaCreacion = DateTime.UtcNow,
         });
@@ -645,7 +649,12 @@ public class ServicioEntregas(
         // Se recalculan los destinatarios en vez de reusar los del envío anterior: si se
         // reencola es justamente porque algo estaba mal, y muchas veces lo que estaba mal era
         // la lista de correos de la empresa.
-        await EncolarCopiaAsync(entrega, ct);
+        var idSolicitud = await db.Solicitudes
+            .Where(s => s.EntregaId == entrega.EntregaId)
+            .Select(s => s.IdSolicitudOrigen)
+            .FirstOrDefaultAsync(ct);
+
+        await EncolarCopiaAsync(entrega, idSolicitud, ct);
 
         return await ListarEnviosAsync(entregaUid, ct);
     }
