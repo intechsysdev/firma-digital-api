@@ -40,7 +40,7 @@ public class ServicioSolicitudes(
                 "La solicitud necesita una empresa: usa la llave de la empresa o elige una en la consola.");
 
         var idOrigen = TextoMobiControl.Normalizar(solicitud.IdSolicitud, 100)
-            ?? throw new ErrorSolicitudException("Falta el identificador de la solicitud (idSolicitud).");
+            ?? throw new ErrorSolicitudException("Falta el SharePointId (identificador de la solicitud en el origen).");
 
         // Se exigen aquí y no al firmar: si faltan, el asociado abriría un enlace que no puede
         // terminar, y el origen no se enteraría hasta que alguien reclame.
@@ -53,7 +53,7 @@ public class ServicioSolicitudes(
                 "Falta con qué identificar el equipo: envíe el IMEI, el serial o el deviceId de MobiControl.");
 
         var cedula = TextoMobiControl.Normalizar(solicitud.Cedula, 20)
-            ?? throw new ErrorSolicitudException("Falta la cédula del asociado.");
+            ?? throw new ErrorSolicitudException("Falta la cédula del asociado (NumeroCedula).");
 
         // Pedir los datos de MobiControl es decir que el equipo está allí.
         if (solicitud is { DatosDesdeMobicontrol: true, DispositivoConMobicontrol: false })
@@ -550,7 +550,9 @@ public class ServicioSolicitudes(
             EstadoVisible(solicitud),
             enlaces.UrlParaFirmar(solicitud.SolicitudUid),
             Utc(solicitud.FechaVencimiento),
-            duplicada);
+            duplicada,
+            Utc(solicitud.FechaFirma),
+            solicitud.Estado == EstadoSolicitud.FIRMADA ? enlaces.UrlDocumento(solicitud.SolicitudUid) : null);
 
     private SolicitudDto AVista(SolicitudFirma solicitud) =>
         new(solicitud.IdSolicitudOrigen,

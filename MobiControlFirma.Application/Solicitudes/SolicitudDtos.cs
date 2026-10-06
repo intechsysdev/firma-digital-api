@@ -35,8 +35,10 @@ public class DatosActaEditables
     [MaxLength(100)] public string? Canal { get; set; }
     [MaxLength(100)] public string? Distrito { get; set; }
 
-    /// <summary>Costo tal como se muestra en el acta ("$ 1.200.000", "1200000"…).</summary>
-    [MaxLength(50)]  public string? Costo { get; set; }
+    /// <summary>Costo tal como se muestra en el acta ("$ 1.200.000", "1200000"…). Acepta número.</summary>
+    [MaxLength(50)]
+    [JsonConverter(typeof(TextoONumeroJsonConverter))]
+    public string? Costo { get; set; }
 
     public string? Entregables { get; set; }
 
@@ -54,9 +56,53 @@ public class CrearSolicitudRequest : DatosActaEditables
     /// Identificador de la solicitud en el sistema de origen (en HV, el ID de SharePoint). Es la
     /// llave de la integración: vuelve tal cual en la consulta y en el callback.
     /// </summary>
-    [Required, MaxLength(100)]
+    [MaxLength(100)]
     [JsonConverter(typeof(TextoONumeroJsonConverter))]
     public string IdSolicitud { get; set; } = string.Empty;
+
+    // ---- Nombres del contrato de SharePoint ----
+    // HV manda los campos con sus propios nombres. Son alias de escritura de los de arriba: llegan
+    // a los mismos datos, y los nombres anteriores (idSolicitud, cedula, fabricante…) siguen
+    // sirviendo. Los que coinciden sin importar mayúsculas (IMEI, Serial, Canal…) no necesitan alias.
+
+    /// <summary>Alias de <see cref="IdSolicitud"/>: el ID del elemento de SharePoint, texto o número.</summary>
+    [JsonPropertyName("SharePointId")]
+    [JsonConverter(typeof(TextoONumeroJsonConverter))]
+    public string? SharePointId { set { if (!string.IsNullOrWhiteSpace(value)) IdSolicitud = value; } }
+
+    /// <summary>Alias de <see cref="DatosActaEditables.Cedula"/>.</summary>
+    [JsonPropertyName("NumeroCedula")]
+    [JsonConverter(typeof(TextoONumeroJsonConverter))]
+    public string? NumeroCedula { set { if (value is not null) Cedula = value; } }
+
+    /// <summary>Alias de <see cref="DatosActaEditables.Usuario"/>: el responsable del equipo.</summary>
+    [JsonPropertyName("NombreAsociado")]
+    public string? NombreAsociado { set { if (value is not null) Usuario = value; } }
+
+    /// <summary>Alias de <see cref="DatosActaEditables.Fabricante"/>.</summary>
+    [JsonPropertyName("Marca")]
+    public string? Marca { set { if (value is not null) Fabricante = value; } }
+
+    /// <summary>Alias de <see cref="DatosActaEditables.Iccid"/>.</summary>
+    [JsonPropertyName("SIMCard")]
+    [JsonConverter(typeof(TextoONumeroJsonConverter))]
+    public string? SimCard { set { if (value is not null) Iccid = value; } }
+
+    /// <summary>Alias de <see cref="DatosActaEditables.Costo"/>; puede llegar como número.</summary>
+    [JsonPropertyName("CostoEquipo")]
+    [JsonConverter(typeof(TextoONumeroJsonConverter))]
+    public string? CostoEquipo { set { if (value is not null) Costo = value; } }
+
+    /// <summary>Alias de <see cref="NombreDeInterfaz"/>.</summary>
+    [JsonPropertyName("NombreInterfaz")]
+    public string? NombreInterfaz { set { if (value is not null) NombreDeInterfaz = value; } }
+
+    /// <summary>
+    /// Nombre de la empresa en el origen. Solo informativo: la empresa la define la credencial con
+    /// la que se llama, no lo que diga el cuerpo.
+    /// </summary>
+    [MaxLength(200)]
+    public string? Empresa { get; set; }
 
     /// <summary>
     /// Fecha de entrega del equipo. Se imprime en el acta y es la que se escribe en MobiControl.
@@ -135,13 +181,35 @@ public record DatosSolicitud(
 
 /// <param name="Duplicada">True cuando el origen ya había pedido esta misma solicitud.</param>
 /// <param name="UrlFirma">Enlace para firmar. Cada respuesta trae uno nuevo y todos siguen sirviendo.</param>
+/// <param name="UrlDocumento">PDF del acta, si ya se firmó.</param>
 public record SolicitudCreadaResponse(
     Guid SolicitudUid,
     string IdSolicitud,
     string Estado,
     string UrlFirma,
     DateTime FechaVencimiento,
-    bool Duplicada);
+    bool Duplicada,
+    DateTime? FechaFirma = null,
+    string? UrlDocumento = null);
+
+/// <summary>
+/// Respuesta de <c>POST /solicitudes</c> con el contrato de SharePoint. <c>UrlDocumento</c> es el
+/// enlace para firmar mientras la solicitud está pendiente, y el PDF del acta una vez firmada.
+/// </summary>
+public record RespuestaSolicitudSharePoint(
+    [property: JsonPropertyName("SharePointId")] string SharePointId,
+    [property: JsonPropertyName("Estado")] string Estado,
+    [property: JsonPropertyName("FechaFirma")] DateTime? FechaFirma,
+    [property: JsonPropertyName("UrlDocumento")] string? UrlDocumento)
+{
+    public static RespuestaSolicitudSharePoint Desde(SolicitudCreadaResponse s) => s.Estado switch
+    {
+        "FIRMADA" => new(s.IdSolicitud, "Firmado", s.FechaFirma, s.UrlDocumento),
+        "RECHAZADA" => new(s.IdSolicitud, "Rechazado", null, null),
+        "VENCIDA" => new(s.IdSolicitud, "Vencido", null, null),
+        _ => new(s.IdSolicitud, "Pendiente", null, s.UrlFirma),
+    };
+}
 
 /// <summary>
 /// Todo lo de una solicitud: lo que mandó el origen, en qué va y, si se firmó, el acta tal como

@@ -21,16 +21,17 @@ public class SolicitudesController(IServicioSolicitudes solicitudes) : Controlle
     /// <c>idSolicitud</c> devuelve la solicitud existente con un enlace nuevo que sirve igual.
     /// </summary>
     [HttpPost]
-    [ProducesResponseType(typeof(SolicitudCreadaResponse), StatusCodes.Status201Created)]
-    [ProducesResponseType(typeof(SolicitudCreadaResponse), StatusCodes.Status200OK)]
-    public async Task<ActionResult<SolicitudCreadaResponse>> Crear(
+    [ProducesResponseType(typeof(RespuestaSolicitudSharePoint), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(RespuestaSolicitudSharePoint), StatusCodes.Status200OK)]
+    public async Task<ActionResult<RespuestaSolicitudSharePoint>> Crear(
         CrearSolicitudRequest solicitud, CancellationToken ct)
     {
         var resultado = await solicitudes.CrearAsync(solicitud, ct);
+        var respuesta = RespuestaSolicitudSharePoint.Desde(resultado);
 
         return resultado.Duplicada
-            ? Ok(resultado)
-            : CreatedAtAction(nameof(Obtener), new { idSolicitud = resultado.IdSolicitud }, resultado);
+            ? Ok(respuesta)
+            : CreatedAtAction(nameof(Obtener), new { idSolicitud = resultado.IdSolicitud }, respuesta);
     }
 
     /// <summary>
