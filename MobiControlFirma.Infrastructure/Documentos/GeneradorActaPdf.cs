@@ -70,7 +70,7 @@ public class GeneradorActaPdf : IGeneradorActaPdf
             {
                 pagina.Size(PageSizes.A4);
                 pagina.Margin(2, Unit.Centimetre);
-                pagina.DefaultTextStyle(x => x.FontSize(9.5f).LineHeight(1.35f).FontColor("#1F2933"));
+                pagina.DefaultTextStyle(x => x.FontSize(9.5f).LineHeight(1.35f).FontColor("#1F1F1D"));
 
                 pagina.Header().Element(c => Encabezado(c, datos));
                 pagina.Content().PaddingVertical(12).Element(c => Cuerpo(c, datos, firmaPng));
@@ -83,34 +83,34 @@ public class GeneradorActaPdf : IGeneradorActaPdf
 
     private static void Encabezado(IContainer contenedor, DatosActa datos)
     {
-        contenedor.BorderBottom(1).BorderColor("#D9E2EC").PaddingBottom(8).Row(fila =>
+        contenedor.BorderBottom(1.5f).BorderColor("#AF1839").PaddingBottom(8).Row(fila =>
         {
             fila.RelativeItem().Column(columna =>
             {
                 columna.Item().Text("ACTA DE ENTREGA DE DISPOSITIVO MÓVIL")
-                    .FontSize(13).SemiBold().FontColor("#102A43");
+                    .FontSize(13).SemiBold().FontColor("#751326");
                 columna.Item().Text("Documento firmado digitalmente")
-                    .FontSize(8).FontColor("#627D98");
+                    .FontSize(8).FontColor("#5A5958");
             });
 
             fila.ConstantItem(160).AlignRight().Column(columna =>
             {
                 columna.Item().Text($"No. {datos.EntregaUid.ToString()[..8].ToUpperInvariant()}")
-                    .FontSize(9).SemiBold().FontColor("#102A43");
+                    .FontSize(9).SemiBold().FontColor("#1F1F1D");
                 columna.Item().Text(datos.FechaFirma.ToString("dd/MM/yyyy HH:mm", Colombia))
-                    .FontSize(8).FontColor("#627D98");
+                    .FontSize(8).FontColor("#5A5958");
             });
         });
     }
 
     private static void PiePagina(IContainer contenedor, DatosActa datos)
     {
-        contenedor.BorderTop(1).BorderColor("#D9E2EC").PaddingTop(6).Row(fila =>
+        contenedor.BorderTop(1).BorderColor("#E4E2DE").PaddingTop(6).Row(fila =>
         {
-            fila.RelativeItem().Text(datos.EntregaUid.ToString()).FontSize(7).FontColor("#9FB3C8");
+            fila.RelativeItem().Text(datos.EntregaUid.ToString()).FontSize(7).FontColor("#8A8986");
             fila.ConstantItem(90).AlignRight().Text(texto =>
             {
-                texto.DefaultTextStyle(x => x.FontSize(7).FontColor("#9FB3C8"));
+                texto.DefaultTextStyle(x => x.FontSize(7).FontColor("#8A8986"));
                 texto.Span("Página ");
                 texto.CurrentPageNumber();
                 texto.Span(" de ");
@@ -148,7 +148,7 @@ public class GeneradorActaPdf : IGeneradorActaPdf
             {
                 columna.Item().Column(bloque =>
                 {
-                    bloque.Item().Text("Otros entregables").SemiBold().FontSize(10).FontColor("#102A43");
+                    bloque.Item().Text("Otros entregables").SemiBold().FontSize(10).FontColor("#1F1F1D");
                     bloque.Item().PaddingTop(2).Text(datos.Entregables);
                 });
             }
@@ -169,10 +169,10 @@ public class GeneradorActaPdf : IGeneradorActaPdf
 
     private static void TablaDatos(IContainer contenedor, DatosActa datos)
     {
-        contenedor.Background("#F7F9FC").Border(1).BorderColor("#D9E2EC").Padding(12).Column(columna =>
+        contenedor.Background("#F7F6F4").Border(1).BorderColor("#E4E2DE").Padding(12).Column(columna =>
         {
             columna.Item().PaddingBottom(6).Text("Datos del equipo")
-                .SemiBold().FontSize(10).FontColor("#102A43");
+                .SemiBold().FontSize(10).FontColor("#1F1F1D");
 
             columna.Item().Table(tabla =>
             {
@@ -199,9 +199,9 @@ public class GeneradorActaPdf : IGeneradorActaPdf
 
         static void Fila(TableDescriptor tabla, string etiquetaA, string? valorA, string etiquetaB, string? valorB)
         {
-            tabla.Cell().PaddingVertical(2).Text(etiquetaA).SemiBold().FontSize(8.5f).FontColor("#486581");
+            tabla.Cell().PaddingVertical(2).Text(etiquetaA).SemiBold().FontSize(8.5f).FontColor("#5A5958");
             tabla.Cell().PaddingVertical(2).Text(Mostrar(valorA));
-            tabla.Cell().PaddingVertical(2).Text(etiquetaB).SemiBold().FontSize(8.5f).FontColor("#486581");
+            tabla.Cell().PaddingVertical(2).Text(etiquetaB).SemiBold().FontSize(8.5f).FontColor("#5A5958");
             tabla.Cell().PaddingVertical(2).Text(Mostrar(valorB));
         }
     }
@@ -213,7 +213,7 @@ public class GeneradorActaPdf : IGeneradorActaPdf
             columna.Spacing(8);
 
             columna.Item().Text("SEGUNDA: OBLIGACIONES DEL TENEDOR (TRABAJADOR):")
-                .SemiBold().FontSize(10).FontColor("#102A43");
+                .SemiBold().FontSize(10).FontColor("#1F1F1D");
 
             columna.Item().Column(lista =>
             {
@@ -235,11 +235,11 @@ public class GeneradorActaPdf : IGeneradorActaPdf
             });
 
             columna.Item().Text("TERCERA: AUTORIZACIÓN DESCUENTOS:")
-                .SemiBold().FontSize(10).FontColor("#102A43");
+                .SemiBold().FontSize(10).FontColor("#1F1F1D");
             columna.Item().Text(TextoTercera).Justify();
 
             columna.Item().Text("CUARTA: SANCIONES POR EVENTO Y DESCUENTOS:")
-                .SemiBold().FontSize(10).FontColor("#102A43");
+                .SemiBold().FontSize(10).FontColor("#1F1F1D");
             columna.Item().Text(TextoCuarta);
 
             columna.Item().Column(lista =>
@@ -254,7 +254,7 @@ public class GeneradorActaPdf : IGeneradorActaPdf
         {
             columna.Item().Row(fila =>
             {
-                fila.ConstantItem(18).Text(marca).SemiBold().FontColor("#486581");
+                fila.ConstantItem(18).Text(marca).SemiBold().FontColor("#5A5958");
                 fila.RelativeItem().Text(texto).Justify();
             });
         }
@@ -266,18 +266,18 @@ public class GeneradorActaPdf : IGeneradorActaPdf
         // parte del acta que vale como prueba, así que se mantiene entero.
         contenedor.ShowEntire().PaddingTop(16).Column(columna =>
         {
-            columna.Item().Text("FIRMA DEL ASOCIADO").SemiBold().FontSize(10).FontColor("#102A43");
+            columna.Item().Text("FIRMA DEL ASOCIADO").SemiBold().FontSize(10).FontColor("#1F1F1D");
 
             columna.Item().PaddingTop(6).Width(260).Height(90)
-                .Border(1).BorderColor("#D9E2EC").Background("#FFFFFF").Padding(6)
+                .Border(1).BorderColor("#E4E2DE").Background("#FFFFFF").Padding(6)
                 .Image(firmaPng).FitArea();
 
-            columna.Item().Width(260).BorderTop(1).BorderColor("#334E68").PaddingTop(4).Column(pie =>
+            columna.Item().Width(260).BorderTop(1).BorderColor("#3C3C3B").PaddingTop(4).Column(pie =>
             {
                 pie.Item().Text(datos.NombreAsociadoFirmante).SemiBold();
-                pie.Item().Text($"C.C. {datos.Cedula}").FontSize(8.5f).FontColor("#486581");
+                pie.Item().Text($"C.C. {datos.Cedula}").FontSize(8.5f).FontColor("#5A5958");
                 pie.Item().Text($"Firmado el {datos.FechaFirma.ToString("dd/MM/yyyy 'a las' HH:mm", Colombia)}")
-                    .FontSize(8).FontColor("#829AB1");
+                    .FontSize(8).FontColor("#8A8986");
             });
         });
     }
