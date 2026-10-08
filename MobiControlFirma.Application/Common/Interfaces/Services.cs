@@ -64,7 +64,48 @@ public interface IClienteMobiControl
 
     /// <summary>Le pide al equipo que reporte su posición ahora. La respuesta llega después, no aquí.</summary>
     Task LocalizarAsync(string deviceId, CancellationToken ct = default);
+
+    // ---- Atributos personalizados ----
+    // Las definiciones son de toda la consola; los valores, de cada equipo. Lanzan
+    // ErrorSolicitudException con el motivo cuando MobiControl rechaza la operación.
+
+    Task<IReadOnlyList<AtributoMobiControl>> ListarAtributosAsync(CancellationToken ct = default);
+
+    Task<AtributoMobiControl> CrearAtributoAsync(AtributoMobiControl atributo, CancellationToken ct = default);
+
+    /// <summary>Cambia nombre, tipo, opciones y si se pasa al equipo. Conserva el ReferenceId.</summary>
+    Task<AtributoMobiControl> ActualizarAtributoAsync(string nombreActual, AtributoMobiControl atributo, CancellationToken ct = default);
+
+    /// <summary>False si MobiControl ya no lo tenía.</summary>
+    Task<bool> EliminarAtributoAsync(string nombre, CancellationToken ct = default);
+
+    /// <summary>Los valores de todos los atributos en un equipo, también los heredados de su grupo.</summary>
+    Task<IReadOnlyList<ValorAtributoMobiControl>> ValoresAtributosAsync(string deviceId, CancellationToken ct = default);
+
+    /// <summary>Valor con su tipo JSON: bool para sí/no, número para los numéricos, texto para lo demás.</summary>
+    Task GuardarValoresAtributosAsync(string deviceId, IReadOnlyList<(string Nombre, object Valor)> valores, CancellationToken ct = default);
 }
+
+/// <summary>Tipos de atributo tal como los nombra MobiControl.</summary>
+public static class TiposAtributo
+{
+    public const string Texto = "Text";
+    public const string Lista = "Enumerator";
+    public const string Fecha = "Date";
+    public const string Numero = "Float";
+    public const string SiNo = "Boolean";
+
+    public static readonly IReadOnlyList<string> Todos = [Texto, Lista, Fecha, Numero, SiNo];
+}
+
+/// <param name="Tipo">Ver <see cref="TiposAtributo"/>.</param>
+/// <param name="Opciones">Solo para las listas (Enumerator).</param>
+/// <param name="PasaAlEquipo">PropagateToDevice: el valor se copia al equipo y sus apps lo pueden leer.</param>
+public record AtributoMobiControl(string Nombre, string Tipo, IReadOnlyList<string> Opciones, bool PasaAlEquipo, string? ReferenceId = null);
+
+/// <param name="Heredado">El equipo no tiene valor propio: lo toma de su grupo.</param>
+/// <param name="Origen">Grupo del que lo hereda, si MobiControl lo dice.</param>
+public record ValorAtributoMobiControl(string Nombre, string? Valor, bool Heredado, string? Origen = null);
 
 /// <summary>Un equipo tal como lo ve MobiControl, reducido a lo que usa Geolocalización.</summary>
 public record EquipoMobiControl(

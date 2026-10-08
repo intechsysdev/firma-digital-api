@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using MobiControlFirma.Application.Common.Interfaces;
+using MobiControlFirma.Application.Atributos;
 using MobiControlFirma.Application.Entregas;
 using MobiControlFirma.Application.Geolocalizacion;
 using MobiControlFirma.Application.Solicitudes;
@@ -97,6 +98,7 @@ public static class DependencyInjection
         services.AddScoped<IServicioEntregas, ServicioEntregas>();
         services.AddScoped<IServicioSolicitudes, ServicioSolicitudes>();
         services.AddScoped<IServicioGeolocalizacion, ServicioGeolocalizacion>();
+        services.AddScoped<IServicioAtributos, ServicioAtributos>();
 
         return services;
     }

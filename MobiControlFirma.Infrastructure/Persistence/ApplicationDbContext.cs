@@ -260,6 +260,8 @@ public class ApplicationDbContext(
             e.Property(x => x.Nombre).HasMaxLength(150).IsRequired();
             e.Property(x => x.OneApiKey).HasMaxLength(200);
             e.Property(x => x.OneApiSecret).HasMaxLength(200);
+            e.Property(x => x.AtributoFirma).HasMaxLength(100);
+            e.Property(x => x.AtributoFecha).HasMaxLength(100);
             e.Property(x => x.Activo).HasDefaultValue(true);
 
             e.Property(x => x.ApiKeyHash).HasColumnType("varbinary(32)").IsRequired();

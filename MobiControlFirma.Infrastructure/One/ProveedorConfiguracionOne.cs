@@ -61,7 +61,13 @@ public class ProveedorConfiguracionOne(
             var cuerpo = await respuesta.Content.ReadFromJsonAsync<RespuestaOne>(ct);
             if (cuerpo is null) return null;
 
-            var configuracion = Traducir(cuerpo);
+            // Los atributos elegidos en la consola de firma mandan sobre las variables de One.
+            var traducida = Traducir(cuerpo);
+            var configuracion = traducida with
+            {
+                MobiControlAtributoFirma = empresa.AtributoFirma ?? traducida.MobiControlAtributoFirma,
+                MobiControlAtributoFecha = empresa.AtributoFecha ?? traducida.MobiControlAtributoFecha,
+            };
 
             cache.Set(Clave(empresaId), configuracion, Vigencia);
             return configuracion;

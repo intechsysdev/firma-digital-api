@@ -50,6 +50,19 @@ public class Empresa
 
     public DateTime? ApiKeyRotadaEn { get; set; }
 
+    // ---- Atributos que firma escribe en MobiControl al firmar un acta ----
+
+    /// <summary>
+    /// Atributo (sí/no) donde se marca el equipo como firmado, elegido en la consola de firma
+    /// entre los de MobiControl. Null: se usa la variable MOBICONTROL_ATRIBUTO_FIRMA de One, o
+    /// "Firma de entrega". Vive aquí y no en One porque se elige viendo la lista de MobiControl,
+    /// que solo firma sabe consultar.
+    /// </summary>
+    public string? AtributoFirma { get; set; }
+
+    /// <summary>Atributo (fecha) con el día de la entrega. Igual que <see cref="AtributoFirma"/>.</summary>
+    public string? AtributoFecha { get; set; }
+
     public bool Activo { get; set; } = true;
 
     public DateTime FechaCreacion { get; set; }
