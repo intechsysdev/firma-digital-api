@@ -121,7 +121,8 @@ public record EquipoMobiControl(
     string? Grupo,
     string? Imei,
     string? Telefono,
-    string? Serial)
+    string? Serial,
+    string? Iccid = null)
 {
     /// <summary>Solo teléfonos y tabletas reportan posición: pedirla a un Mac o a un PC es una llamada perdida.</summary>
     public bool TieneGps => Plataforma is "Android" or "iOS";
@@ -143,5 +144,13 @@ public interface IEnviadorCorreo
         string cuerpoHtml,
         string nombreArchivo,
         byte[] pdf,
+        CancellationToken ct = default);
+
+    /// <summary>Un correo sin adjunto: el enlace de firma que se le manda al asociado.</summary>
+    Task<ResultadoCorreo> EnviarAsync(
+        ConfiguracionEmpresa config,
+        IReadOnlyList<string> destinatarios,
+        string asunto,
+        string cuerpoHtml,
         CancellationToken ct = default);
 }

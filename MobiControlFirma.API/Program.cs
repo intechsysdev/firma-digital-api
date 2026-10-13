@@ -83,6 +83,7 @@ builder.Services.AddAuthorization();
 // como los servicios de MobiControl y correo. Necesita el accessor para leer la petición viva.
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IContextoEmpresa, ContextoEmpresa>();
+builder.Services.AddScoped<PermisosEmpresa>();
 
 // --- Enlaces de firma ---
 // El nombre de aplicación fija el anillo de llaves: sin él, dos despliegues del mismo API en

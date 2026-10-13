@@ -748,9 +748,19 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
                     b.Property<int?>("CodigoHttpCallback")
                         .HasColumnType("int");
 
+                    b.Property<bool>("CreadaEnConsola")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("CreadaPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<string>("DatosOrigen")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DeviceId")
+                        .HasColumnType("varchar(100)");
 
                     b.Property<int>("EmpresaId")
                         .HasColumnType("int");
@@ -832,6 +842,10 @@ namespace MobiControlFirma.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("SolicitudUid")
                         .IsUnique();
+
+                    b.HasIndex("EmpresaId", "DeviceId")
+                        .HasDatabaseName("IX_SolicitudesFirma_DeviceId")
+                        .HasFilter("[DeviceId] IS NOT NULL");
 
                     b.HasIndex("EmpresaId", "FechaActualizacion")
                         .HasDatabaseName("IX_SolicitudesFirma_Cambios");

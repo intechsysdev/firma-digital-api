@@ -133,6 +133,7 @@ public class ServicioSolicitudes(
                 existente.DatosOrigen = JsonSerializer.Serialize(datos, Json);
                 existente.Imei = ClaveEquipo(imei, 50);
                 existente.Serial = ClaveEquipo(serial, 100);
+                existente.DeviceId = deviceId;
                 existente.FechaVencimiento = vence;
                 existente.FechaActualizacion = ahora;
                 await db.SaveChangesAsync(ct);
@@ -151,6 +152,7 @@ public class ServicioSolicitudes(
             DatosOrigen = JsonSerializer.Serialize(datos, Json),
             Imei = ClaveEquipo(imei, 50),
             Serial = ClaveEquipo(serial, 100),
+            DeviceId = deviceId,
             Estado = EstadoSolicitud.PENDIENTE,
             FechaCreacion = ahora,
             FechaActualizacion = ahora,
@@ -178,7 +180,8 @@ public class ServicioSolicitudes(
         tamanoPagina = Math.Clamp(tamanoPagina, 1, 200);
 
         var ahora = DateTime.UtcNow;
-        var consulta = db.Solicitudes.AsNoTracking();
+        // Las creadas en la consola no son del origen: no las pidió y no tiene cómo cruzarlas.
+        var consulta = db.Solicitudes.AsNoTracking().Where(s => !s.CreadaEnConsola);
 
         if (desde is { } d)
         {
@@ -266,7 +269,7 @@ public class ServicioSolicitudes(
             solicitud.EntregaId = registro.EntregaId;
             solicitud.FechaFirma = registro.FechaFirma;
             solicitud.FechaActualizacion = DateTime.UtcNow;
-            solicitud.EstadoCallback = EstadoCallback.PENDIENTE;
+            solicitud.EstadoCallback = AvisoAlCerrar(solicitud);
             solicitud.ProximoIntentoCallback = null;
 
             await db.SaveChangesAsync(ct);
@@ -297,6 +300,9 @@ public class ServicioSolicitudes(
 
         if (solicitud.Estado == EstadoSolicitud.PENDIENTE)
             throw new ErrorSolicitudException("La solicitud todavía no se ha firmado ni rechazado: no hay nada que avisar.");
+
+        if (solicitud.CreadaEnConsola)
+            throw new ErrorSolicitudException("La solicitud se creó en la consola: no hay sistema de origen al que avisar.");
 
         // Los intentos se reinician: si se reintenta a mano es porque se corrigió algo (casi
         // siempre la URL del callback en One) y merece la escalera completa otra vez.
@@ -388,15 +394,15 @@ public class ServicioSolicitudes(
             // Aquí no hay formulario en el equipo que esperar a que se cierre: la entrega se
             // marca en MobiControl en cuanto queda firmada.
             SincronizarMobiControl = conMobiControl,
-            // Va en el asunto del correo con el acta.
-            IdSolicitud = solicitud.IdSolicitudOrigen,
+            // Va en el asunto del correo con el acta. Las de la consola no tienen número del origen.
+            IdSolicitud = solicitud.CreadaEnConsola ? null : solicitud.IdSolicitudOrigen,
         }, ipOrigen, userAgent, ct);
 
         solicitud.Estado = EstadoSolicitud.FIRMADA;
         solicitud.EntregaId = registro.EntregaId;
         solicitud.FechaFirma = registro.FechaFirma;
         solicitud.FechaActualizacion = DateTime.UtcNow;
-        solicitud.EstadoCallback = EstadoCallback.PENDIENTE;
+        solicitud.EstadoCallback = AvisoAlCerrar(solicitud);
         solicitud.ProximoIntentoCallback = null;
 
         await db.SaveChangesAsync(ct);
@@ -434,7 +440,7 @@ public class ServicioSolicitudes(
         solicitud.MotivoRechazo = motivo;
         solicitud.RechazadoPor = TextoMobiControl.Normalizar(rechazo.Nombre, 200);
         solicitud.FechaActualizacion = solicitud.FechaRechazo.Value;
-        solicitud.EstadoCallback = EstadoCallback.PENDIENTE;
+        solicitud.EstadoCallback = AvisoAlCerrar(solicitud);
         solicitud.ProximoIntentoCallback = null;
 
         await db.SaveChangesAsync(ct);
@@ -498,6 +504,14 @@ public class ServicioSolicitudes(
                ?? flota.FirstOrDefault(e => claveSerial is not null && ClaveEquipo(e.Serial, 100) == claveSerial);
     }
 
+    /// <summary>
+    /// El aviso al origen al firmar o rechazar. Las creadas en la consola no tienen origen: si se
+    /// encolaran, el aviso iría a la URL de callback de la empresa con una solicitud que el origen
+    /// nunca pidió.
+    /// </summary>
+    private static EstadoCallback? AvisoAlCerrar(SolicitudFirma solicitud) =>
+        solicitud.CreadaEnConsola ? null : EstadoCallback.PENDIENTE;
+
     private static string Descripcion(string? deviceId, string? imei, string? serial) =>
         string.Join(" ni ", new[]
         {
@@ -510,7 +524,7 @@ public class ServicioSolicitudes(
     /// IMEI o serial reducidos a letras y dígitos, que es como se guardan y se buscan: el origen
     /// los escribe "35 678901 234567 8" o "R58M-1234" y MobiControl los reporta sin separadores.
     /// </summary>
-    private static string? ClaveEquipo(string? valor, int maximo)
+    internal static string? ClaveEquipo(string? valor, int maximo)
     {
         var limpio = TextoMobiControl.Normalizar(valor);
         if (limpio is null) return null;

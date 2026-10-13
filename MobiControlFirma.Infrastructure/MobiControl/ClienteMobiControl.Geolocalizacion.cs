@@ -52,7 +52,8 @@ public partial class ClienteMobiControl
                     Texto(equipo, "Path"),
                     Texto(equipo, "IMEI_MEID_ESN"),
                     Texto(equipo, "PhoneNumber"),
-                    Texto(equipo, "HardwareSerialNumber")));
+                    Texto(equipo, "HardwareSerialNumber"),
+                    Texto(equipo, "ICCID")));
             }
 
             if (json.RootElement.GetArrayLength() < TamanoPagina) break;

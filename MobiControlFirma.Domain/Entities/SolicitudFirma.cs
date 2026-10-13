@@ -38,6 +38,21 @@ public class SolicitudFirma : IDeEmpresa
     public string? Imei { get; set; }
     public string? Serial { get; set; }
 
+    /// <summary>
+    /// Equipo en MobiControl. Duplica el de <see cref="DatosOrigen"/> para que la consola vea, por
+    /// equipo, si ya tiene un enlace de firma esperando.
+    /// </summary>
+    public string? DeviceId { get; set; }
+
+    /// <summary>
+    /// La creó un usuario desde la consola y no un sistema de origen: no hay origen al que avisar
+    /// cuando se firme, ni debe aparecerle en su sincronización.
+    /// </summary>
+    public bool CreadaEnConsola { get; set; }
+
+    /// <summary>Correo de quien la creó en la consola.</summary>
+    public string? CreadaPor { get; set; }
+
     public EstadoSolicitud Estado { get; set; } = EstadoSolicitud.PENDIENTE;
 
     public DateTime FechaCreacion { get; set; }

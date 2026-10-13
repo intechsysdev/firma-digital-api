@@ -1,10 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using MobiControlFirma.API.Configuration;
 using MobiControlFirma.Application.Atributos;
-using MobiControlFirma.Application.Common.Interfaces;
-using MobiControlFirma.Infrastructure.Persistence;
 
 namespace MobiControlFirma.API.Controllers;
 
@@ -20,8 +17,7 @@ namespace MobiControlFirma.API.Controllers;
 [Authorize]
 public class AtributosController(
     IServicioAtributos atributos,
-    IContextoEmpresa empresa,
-    ApplicationDbContext db) : ControllerBase
+    PermisosEmpresa permisos) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<ListaAtributosDto>> Listar(CancellationToken ct) =>
@@ -74,19 +70,7 @@ public class AtributosController(
 
     // ------------------------------------------------------------------------------------
 
-    private async Task<bool> PuedeAdministrarAsync(CancellationToken ct)
-    {
-        if (User.IsInRole(One.RolPlataforma)) return true;
-
-        if (empresa.EmpresaId is not { } empresaId) return false;
-
-        var tenantId = await db.Empresas.AsNoTracking()
-            .Where(e => e.EmpresaId == empresaId)
-            .Select(e => e.OneTenantId)
-            .FirstAsync(ct);
-
-        return ResolucionTenantMiddleware.RolEn(User, tenantId) is "Owner" or "Admin";
-    }
+    private Task<bool> PuedeAdministrarAsync(CancellationToken ct) => permisos.PuedeAdministrarAsync(User, ct);
 
     private ObjectResult Prohibido() => StatusCode(StatusCodes.Status403Forbidden, new
     {

@@ -325,6 +325,12 @@ public class ApplicationDbContext(
             e.HasIndex(x => new { x.EmpresaId, x.Serial }).HasFilter("[Serial] IS NOT NULL")
                 .HasDatabaseName("IX_SolicitudesFirma_Serial");
 
+            // La consola busca por equipo si ya hay un enlace esperando.
+            e.Property(x => x.DeviceId).HasColumnType("varchar(100)");
+            e.HasIndex(x => new { x.EmpresaId, x.DeviceId }).HasFilter("[DeviceId] IS NOT NULL")
+                .HasDatabaseName("IX_SolicitudesFirma_DeviceId");
+            e.Property(x => x.CreadaPor).HasMaxLength(200);
+
             e.Property(x => x.Estado)
                 .HasConversion<string>()
                 .HasColumnType("varchar(20)")

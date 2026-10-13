@@ -14,14 +14,31 @@ namespace MobiControlFirma.Infrastructure.Correo;
 /// </summary>
 public class EnviadorCorreoInfobip(HttpClient http, ILogger<EnviadorCorreoInfobip> logger) : IEnviadorCorreo
 {
-    public async Task<ResultadoCorreo> EnviarActaAsync(
+    public Task<ResultadoCorreo> EnviarActaAsync(
         ConfiguracionEmpresa config,
         IReadOnlyList<string> destinatarios,
         string asunto,
         string cuerpoHtml,
         string nombreArchivo,
         byte[] pdf,
-        CancellationToken ct = default)
+        CancellationToken ct = default) =>
+        EnviarConAdjuntoAsync(config, destinatarios, asunto, cuerpoHtml, (nombreArchivo, pdf), ct);
+
+    public Task<ResultadoCorreo> EnviarAsync(
+        ConfiguracionEmpresa config,
+        IReadOnlyList<string> destinatarios,
+        string asunto,
+        string cuerpoHtml,
+        CancellationToken ct = default) =>
+        EnviarConAdjuntoAsync(config, destinatarios, asunto, cuerpoHtml, null, ct);
+
+    private async Task<ResultadoCorreo> EnviarConAdjuntoAsync(
+        ConfiguracionEmpresa config,
+        IReadOnlyList<string> destinatarios,
+        string asunto,
+        string cuerpoHtml,
+        (string Nombre, byte[] Pdf)? adjunto,
+        CancellationToken ct)
     {
         if (!config.CorreoConfigurado)
             return new ResultadoCorreo(false, null,
@@ -46,9 +63,12 @@ public class EnviadorCorreoInfobip(HttpClient http, ILogger<EnviadorCorreoInfobi
             foreach (var destino in destinatarios)
                 contenido.Add(new StringContent(destino), "to");
 
-            var adjunto = new ByteArrayContent(pdf);
-            adjunto.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
-            contenido.Add(adjunto, "attachment", nombreArchivo);
+            if (adjunto is { } archivo)
+            {
+                var pdf = new ByteArrayContent(archivo.Pdf);
+                pdf.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+                contenido.Add(pdf, "attachment", archivo.Nombre);
+            }
 
             using var peticion = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/email/3/send")
             {
@@ -70,7 +90,7 @@ public class EnviadorCorreoInfobip(HttpClient http, ILogger<EnviadorCorreoInfobi
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error enviando la copia del acta de {Empresa}.", config.TenantNombre);
+            logger.LogError(ex, "Error enviando un correo de {Empresa}.", config.TenantNombre);
             return new ResultadoCorreo(false, null, ex.Message);
         }
     }
