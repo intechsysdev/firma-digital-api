@@ -59,17 +59,25 @@ public class DatosActaConsola
     [MaxLength(100)] public string? CiudadFirma { get; set; }
 }
 
+/// <summary>Un campo del acta que sale de un atributo de MobiControl, con el tipo que tiene allá.</summary>
+/// <param name="Campo">Nombre del campo en el formulario (cedula, estado…).</param>
+/// <param name="Tipo">Como lo nombra MobiControl: Text, Enumerator, Float, Boolean, Date.</param>
+/// <param name="Opciones">Solo para las listas (Enumerator).</param>
+public record CampoMobiControlDto(string Campo, string Atributo, string Tipo, IReadOnlyList<string> Opciones);
+
 /// <param name="Datos">Lo que se precarga en el formulario: lo que MobiControl sabe del equipo.</param>
 /// <param name="AtributosEnMobiControl">
 /// Campos del formulario (cedula, usuario…) que salen de un atributo que existe en la consola. Son
 /// los únicos que se pueden devolver a MobiControl si se corrigen.
 /// </param>
+/// <param name="Campos">Tipo y opciones de cada campo con atributo, para mostrar listas y números como tales.</param>
 /// <param name="PuedeActualizarMobiControl">Dueño o administrador: puede escribir atributos en MobiControl.</param>
 /// <param name="CorreoConfigurado">La empresa puede mandar el enlace por correo.</param>
 public record PrecargaActaDto(
     EquipoConsolaDto Equipo,
     DatosActaConsola Datos,
     IReadOnlyList<string> AtributosEnMobiControl,
+    IReadOnlyList<CampoMobiControlDto> Campos,
     bool PuedeActualizarMobiControl,
     bool CorreoConfigurado);
 
@@ -168,7 +176,7 @@ public class ServicioEquipos(
         var equipo = await EquipoAsync(deviceId, ct);
         var config = await configuracion.ObtenerAsync(empresaId, ct);
 
-        var (valores, existentes) = await AtributosDelEquipoAsync(equipo.DeviceId, ct);
+        var (valores, campos) = await AtributosDelEquipoAsync(equipo.DeviceId, ct);
 
         var datos = new DatosActaConsola
         {
@@ -196,7 +204,8 @@ public class ServicioEquipos(
         return new PrecargaActaDto(
             AVista(equipo, actas.GetValueOrDefault(equipo.DeviceId), pendientes.GetValueOrDefault(equipo.DeviceId)),
             datos,
-            existentes,
+            [.. campos.Select(c => c.Campo)],
+            campos,
             puedeAdministrar,
             config?.CorreoConfigurado ?? false);
     }
@@ -224,6 +233,12 @@ public class ServicioEquipos(
                 "Solo el dueño o un administrador de la empresa puede cambiar los atributos de MobiControl. Desmarca esa opción y el cambio queda solo en el acta.");
 
         var config = await configuracion.ObtenerAsync(empresaId, ct);
+
+        // Las listas viajan con el enlace: el formulario del asociado las muestra igual que aquí.
+        var listas = (await DefinicionesPorCampoAsync(ct))
+            .Where(c => c.Tipo is TiposAtributo.Lista or TiposAtributo.SiNo)
+            .ToDictionary(c => c.Campo, c => c.Tipo == TiposAtributo.SiNo ? (IReadOnlyList<string>)["true", "false"] : c.Opciones);
+
         var imei = TextoMobiControl.Normalizar(solicitud.Imei, 50) ?? TextoMobiControl.Normalizar(equipo.Imei, 50);
         var serial = TextoMobiControl.Normalizar(solicitud.Serial, 100) ?? TextoMobiControl.Normalizar(equipo.Serial, 100);
 
@@ -249,7 +264,8 @@ public class ServicioEquipos(
             NombreDispositivo: TextoMobiControl.Normalizar(equipo.Nombre, 200),
             DispositivoConMobicontrol: true,
             DatosDesdeMobicontrol: true,
-            NombreDeInterfaz: "Consola");
+            NombreDeInterfaz: "Consola",
+            Listas: listas.Count > 0 ? listas : null);
 
         var ahora = DateTime.UtcNow;
 
@@ -320,28 +336,53 @@ public class ServicioEquipos(
     }
 
     /// <summary>
-    /// Los valores del equipo para los campos del acta, y qué campos tienen atributo en la consola.
-    /// Un valor heredado del grupo también sirve: es el que el formulario del equipo vería.
+    /// Los valores del equipo para los campos del acta, y el tipo y las opciones de cada campo que
+    /// tiene atributo en la consola. Un valor heredado del grupo también sirve: es el que el
+    /// formulario del equipo vería.
     /// </summary>
-    private async Task<(Dictionary<string, string> Valores, IReadOnlyList<string> Existentes)> AtributosDelEquipoAsync(
+    private async Task<(Dictionary<string, string> Valores, IReadOnlyList<CampoMobiControlDto> Campos)> AtributosDelEquipoAsync(
         string deviceId, CancellationToken ct)
     {
         var lista = await mobiControl.ValoresAtributosAsync(deviceId, ct);
+        var campos = await DefinicionesPorCampoAsync(ct);
         var valores = new Dictionary<string, string>(StringComparer.Ordinal);
-        var existentes = new List<string>();
+
+        foreach (var campo in campos)
+        {
+            if (Buscar(lista, campo.Atributo) is not { } valor) continue;
+            if (TextoMobiControl.Normalizar(valor.Valor) is not { } texto) continue;
+
+            valores[campo.Campo] = campo.Tipo == TiposAtributo.Numero ? NumeroLegible(texto) : texto;
+        }
+
+        return (valores, campos);
+    }
+
+    /// <summary>Los campos del acta que tienen atributo en la consola, con su tipo y opciones.</summary>
+    private async Task<IReadOnlyList<CampoMobiControlDto>> DefinicionesPorCampoAsync(CancellationToken ct)
+    {
+        var definiciones = await mobiControl.ListarAtributosAsync(ct);
+        var campos = new List<CampoMobiControlDto>();
 
         foreach (var (campo, atributo) in Atributos)
         {
-            var valor = Buscar(lista, atributo);
-            if (valor is null) continue;
-
-            existentes.Add(campo);
-            if (TextoMobiControl.Normalizar(valor.Valor) is { } texto)
-                valores[campo] = texto;
+            var d = definiciones.FirstOrDefault(x => x.Nombre == atributo)
+                    ?? definiciones.FirstOrDefault(x => string.Equals(x.Nombre, atributo, StringComparison.OrdinalIgnoreCase));
+            if (d is not null)
+                campos.Add(new CampoMobiControlDto(campo, d.Nombre, d.Tipo, d.Opciones));
         }
 
-        return (valores, existentes);
+        return campos;
     }
+
+    /// <summary>
+    /// MobiControl guarda los números como decimales: un celular puede llegar "3001234567.0" o en
+    /// notación científica. Se muestran como se escriben.
+    /// </summary>
+    private static string NumeroLegible(string valor) =>
+        decimal.TryParse(valor, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var n)
+            ? n.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)
+            : valor;
 
     private static ValorAtributoMobiControl? Buscar(IReadOnlyList<ValorAtributoMobiControl> lista, string atributo) =>
         lista.FirstOrDefault(v => v.Nombre == atributo)
@@ -365,12 +406,19 @@ public class ServicioEquipos(
             };
 
             var cambios = new List<CambioValorAtributo>();
-            foreach (var (campo, atributo) in Atributos)
+            foreach (var definicion in await DefinicionesPorCampoAsync(ct))
             {
-                if (Buscar(lista, atributo) is not { } actual) continue;
+                if (Buscar(lista, definicion.Atributo) is not { } actual) continue;
 
-                var nuevo = TextoMobiControl.Normalizar(nuevos[campo]);
-                if (nuevo is null || nuevo == TextoMobiControl.Normalizar(actual.Valor)) continue;
+                var nuevo = TextoMobiControl.Normalizar(nuevos[definicion.Campo]);
+                if (nuevo is null) continue;
+
+                // Los números se comparan como números: "3001234567" y "3001234567.0" son el mismo
+                // valor, y reescribirlo sería un cambio que nadie hizo.
+                var anterior = TextoMobiControl.Normalizar(actual.Valor);
+                if (definicion.Tipo == TiposAtributo.Numero && anterior is not null)
+                    (nuevo, anterior) = (NumeroLegible(nuevo), NumeroLegible(anterior));
+                if (nuevo == anterior) continue;
 
                 cambios.Add(new CambioValorAtributo { Nombre = actual.Nombre, Valor = nuevo });
             }

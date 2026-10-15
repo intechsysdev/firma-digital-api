@@ -177,7 +177,12 @@ public record DatosSolicitud(
     string? NombreDispositivo = null,
     [property: JsonConverter(typeof(SiNoJsonConverter))] bool? DispositivoConMobicontrol = null,
     [property: JsonConverter(typeof(SiNoJsonConverter))] bool? DatosDesdeMobicontrol = null,
-    string? NombreDeInterfaz = null);
+    string? NombreDeInterfaz = null,
+    // Opciones de los campos que en MobiControl son listas (estado, canal, distrito…), por campo.
+    // Las guarda la consola al crear el enlace para que el formulario los muestre como listas; las
+    // solicitudes del origen no las traen y el campo ni aparece en sus respuestas.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? Listas = null);
 
 /// <param name="Duplicada">True cuando el origen ya había pedido esta misma solicitud.</param>
 /// <param name="UrlFirma">Enlace para firmar. Cada respuesta trae uno nuevo y todos siguen sirviendo.</param>
