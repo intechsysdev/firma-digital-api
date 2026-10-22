@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+using System.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -27,6 +29,11 @@ public record ComprobacionDto(
     string? MobiControlBaseUrl, string? InfobipRemitente, string? CorreosCopia, string? ConfigVersion,
     bool CallbackConfigurado, string? CallbackUrl, bool CallbackFirmado);
 
+public record CorreoPruebaRequest([Required, EmailAddress, MaxLength(256)] string Destino);
+
+/// <param name="Detalle">Lo que respondió Infobip, o por qué no se intentó.</param>
+public record CorreoPruebaDto(bool Enviado, int? CodigoHttp, string? Detalle, string? Remitente, string? ResponderA, bool Seguimiento);
+
 /// <summary>
 /// Vínculos entre este sistema y los tenants de One. No son empresas: las empresas se crean y se
 /// configuran en One. Aquí solo se registra a qué tenant pertenece cada compartimento de datos,
@@ -41,7 +48,8 @@ public record ComprobacionDto(
 [Authorize(Roles = One.RolPlataforma)]
 public class VinculosController(
     ApplicationDbContext db,
-    IProveedorConfiguracion configuracion) : ControllerBase
+    IProveedorConfiguracion configuracion,
+    IEnviadorCorreo correo) : ControllerBase
 {
     private static VinculoDto AVista(Empresa e, int actas) => new(
         e.EmpresaId, e.OneTenantId, e.OneSlug, e.Nombre,
@@ -156,6 +164,42 @@ public class VinculosController(
             config.MobiControlConfigurado, config.CorreoConfigurado,
             config.MobiControlBaseUrl, config.InfobipRemitente, config.CorreosCopia, config.ConfigVersion,
             config.CallbackConfigurado, config.CallbackUrl, !string.IsNullOrWhiteSpace(config.CallbackSecreto)));
+    }
+
+    /// <summary>
+    /// Manda un correo de prueba con la configuración de correo que la empresa tiene en One (la
+    /// llave, la URL base y el remitente de Infobip). Sirve para comprobarla sin firmar un acta, y
+    /// devuelve lo que responde Infobip tal cual: un remitente sin verificar o una llave mal
+    /// copiada se ven ahí.
+    /// </summary>
+    [HttpPost("{empresaId:int}/correo-prueba")]
+    public async Task<ActionResult<CorreoPruebaDto>> CorreoPrueba(int empresaId, CorreoPruebaRequest solicitud, CancellationToken ct)
+    {
+        if (!await db.Empresas.AnyAsync(e => e.EmpresaId == empresaId, ct))
+            return NotFound(new { message = "No existe ese vínculo." });
+
+        // Siempre con lo último de One: la prueba suele hacerse justo después de cambiar una variable.
+        configuracion.Olvidar(empresaId);
+        var config = await configuracion.ObtenerAsync(empresaId, ct);
+        if (config is null)
+            return Ok(new CorreoPruebaDto(false, null, "No se pudo obtener de One la configuración de la empresa.", null, null, false));
+
+        var remitente = config.InfobipRemitente;
+        if (!config.CorreoConfigurado)
+            return Ok(new CorreoPruebaDto(false, null,
+                "Faltan variables de correo en One (Firma digital → Variables): INFOBIP_BASE_URL, INFOBIP_API_KEY e INFOBIP_REMITENTE.",
+                remitente, config.InfobipResponderA, config.InfobipSeguimiento));
+
+        static string e(string? texto) => WebUtility.HtmlEncode(texto) ?? "";
+        var hora = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("America/Bogota"));
+        var html = $"""
+            <h2 style="font-family:sans-serif;color:#1f2a3a">Correo de prueba</h2>
+            <p style="font-family:sans-serif">Si lo recibes, el envío de correos de <b>{e(config.TenantNombre)}</b> en Firma digital funciona: así llegarán las actas firmadas y los enlaces para firmar.</p>
+            <p style="font-family:sans-serif;font-size:13px;color:#5b6a80">Remitente: {e(remitente)}<br>Responder a: {e(config.InfobipResponderA ?? "el remitente")}<br>Enviado: {hora:dd/MM/yyyy HH:mm}</p>
+            """;
+
+        var resultado = await correo.EnviarAsync(config, [solicitud.Destino.Trim()], $"Prueba de correo · Firma digital · {config.TenantNombre}", html, ct);
+        return Ok(new CorreoPruebaDto(resultado.Exitoso, resultado.CodigoHttp, resultado.Detalle, remitente, config.InfobipResponderA, config.InfobipSeguimiento));
     }
 
     /// <summary>

@@ -452,7 +452,7 @@ public class ServicioEquipos(
             <p><a href="{e(url)}" style="display:inline-block;padding:10px 18px;background:#af1839;color:#ffffff;text-decoration:none;border-radius:6px;font-family:sans-serif">Revisar y firmar el acta</a></p>
             <p style="font-family:sans-serif;font-size:13px;color:#5b6a80">Si el botón no abre, copia esta dirección en el navegador:<br>{e(url)}</p>
             <p style="font-family:sans-serif;font-size:13px;color:#5b6a80">El enlace sirve hasta el {hasta}. Si los datos no corresponden, puedes rechazar el acta desde el mismo enlace.</p>
-            <p style="color:#5b6a80;font-size:12px">{e(config.TenantNombre)} · Mensaje automático, no responder.</p>
+            <p style="color:#5b6a80;font-size:12px">{e(config.TenantNombre)} · {(string.IsNullOrWhiteSpace(config.InfobipResponderA) ? "Mensaje automático, no responder." : "¿Dudas? Responde este correo.")}</p>
             """;
 
         var resultado = await correo.EnviarAsync(config, [destino], $"Acta de entrega para firmar · {config.TenantNombre}", html, ct);

@@ -198,7 +198,7 @@ public class ServicioEnvioCorreos(
               {filaEntrega}
               {filaPdf}
             </table>
-            <p style="color:#5b6a80;font-size:12px">{config.TenantNombre} · Mensaje automático, no responder.</p>
+            <p style="color:#5b6a80;font-size:12px">{config.TenantNombre} · {(string.IsNullOrWhiteSpace(config.InfobipResponderA) ? "Mensaje automático, no responder." : "¿Dudas? Responde este correo.")}</p>
             """;
     }
 }

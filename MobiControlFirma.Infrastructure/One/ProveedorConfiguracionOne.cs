@@ -111,7 +111,10 @@ public class ProveedorConfiguracionOne(
             CallbackUrl: V("CALLBACK_URL"),
             CallbackSecreto: V("CALLBACK_SECRET"),
             GoogleMapsApiKey: V("GOOGLE_MAPS_API_KEY"),
-            ConfigVersion: cuerpo.ConfigVersion ?? string.Empty);
+            ConfigVersion: cuerpo.ConfigVersion ?? string.Empty,
+            InfobipResponderA: V("INFOBIP_RESPONDER_A"),
+            // Activo salvo que se apague explícitamente: una variable sin cargar llega ausente.
+            InfobipSeguimiento: V("INFOBIP_SEGUIMIENTO")?.ToLowerInvariant() is not ("false" or "0" or "no"));
     }
 
     private sealed record RespuestaOne(

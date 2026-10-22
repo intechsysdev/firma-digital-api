@@ -24,7 +24,9 @@ public sealed record ConfiguracionEmpresa(
     string? CallbackUrl,
     string? CallbackSecreto,
     string? GoogleMapsApiKey,
-    string ConfigVersion)
+    string ConfigVersion,
+    string? InfobipResponderA = null,
+    bool InfobipSeguimiento = true)
 {
     /// <summary>Sin consola configurada las actas se firman igual, solo quedan sin sincronizar.</summary>
     public bool MobiControlConfigurado =>
