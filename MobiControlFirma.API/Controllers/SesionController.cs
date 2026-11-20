@@ -67,9 +67,16 @@ public class SesionController(ApplicationDbContext db, EmpresasOne empresasOne, 
                 ResolucionTenantMiddleware.RolEn(User, e.OneTenantId)))
             .ToList();
 
+        var correo = User.FindFirstValue(JwtRegisteredClaimNames.Email) ?? User.Identity?.Name ?? "";
+
+        // El nombre llega como "name" (token de One) o como ClaimTypes.Name (perfil consultado a
+        // One). Si One no tiene el nombre, ese claim trae el correo: ahí no hay nombre que mostrar.
+        var nombre = User.FindFirstValue(JwtRegisteredClaimNames.Name) ?? User.FindFirstValue(ClaimTypes.Name);
+        if (string.IsNullOrWhiteSpace(nombre) || string.Equals(nombre, correo, StringComparison.OrdinalIgnoreCase)) nombre = null;
+
         return Ok(new SesionDto(
-            User.FindFirstValue(JwtRegisteredClaimNames.Email) ?? User.Identity?.Name ?? "",
-            User.FindFirstValue(JwtRegisteredClaimNames.Name),
+            correo,
+            nombre,
             esPlataforma,
             salida));
     }
